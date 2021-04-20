@@ -4,3 +4,5 @@
 .clang_complete
 .gcc-flags.json
 ._*
+pio.map
+src/cubecell.h
