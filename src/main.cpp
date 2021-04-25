@@ -15,6 +15,8 @@ CayenneLPP lpp(51);
 #include "Adafruit_Si7021.h"
 #include "Adafruit_BME280.h"
 #include "Adafruit_TSL2561_U.h"
+#include <Adafruit_ADS1X15.h>
+
 #include <Max44009.h>
 
 
@@ -24,10 +26,13 @@ Max44009 gy49(0x4a);
 Adafruit_BME280 bme280;
 Adafruit_TSL2561_Unified tsl2561 = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT);
 CubeCell_NeoPixel pixels(1, RGB, NEO_GRB + NEO_KHZ800);
+Adafruit_ADS1115 ads1115;
+
 
 bool bme280_found = false;
 bool voltage_found = true;
 bool gy49_found = false;
+bool ads1115_found = false;
 
 bool setup_complete = false;
 
@@ -115,6 +120,14 @@ void setup_i2c() {
       Log.verbose(F("I2C device found at address 0x%x !"),address);
       devices++;
     }
+
+    if (address == 0x48) {
+      // AD-converter
+      ads1115.begin();
+      ads1115_found = true;
+      Log.notice(F("ADS1115 found at 0x%x"),address);
+    }
+
     if (address == 0x4a) {
       // GY-49
       float l = gy49.getLux();
@@ -152,10 +165,17 @@ void read_gy49() {
   lpp.addLuminosity(4,gy49.getLux());
 }
 
+void read_ads1115() {
+  for (int i=0;i<4;i++) {
+    uint16_t r = ads1115.readADC_SingleEnded(i);
+    lpp.addLuminosity(20+i, r);
+  }
+}
+
 // Battery voltage
 void read_voltage() {
   uint16_t v = getBatteryVoltage();
-  lpp.addAnalogInput(5,(float)v / 100.0);
+  lpp.addAnalogInput(5,(float)v / 1000.0);
   Log.verbose(F("Voltage: %d"),v);
 }
 
@@ -180,7 +200,9 @@ void read_sensors() {
   if (gy49_found) {
     read_gy49();
   }
-
+  if (ads1115_found) {
+    read_ads1115();
+  }
   if (voltage_found) {
     read_voltage();
   }
@@ -190,9 +212,6 @@ void read_sensors() {
   }
   if (tsl2561_found) {
     read_tsl2561();
-  }
-  if (ads1115_found) {
-    read_ads1115();
   }
 #endif
 Wire.end();
