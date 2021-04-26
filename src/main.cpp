@@ -49,6 +49,7 @@ DeviceClass_t  loraWanClass = LORAWAN_CLASS;
 
 /*the application data transmission duty cycle.  value in [ms].*/
 uint32_t appTxDutyCycle = 1*60*1000;
+bool variableDutyCycle = false;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = LORAWAN_NETMODE;
@@ -348,6 +349,22 @@ void process_system_power_command(unsigned char len, unsigned char *buffer) {
   }
 }
 
+void process_system_delay_command(unsigned char len, unsigned char *buffer) {
+  if (len != 1) {
+    Log.error(F("Len of delay command != 1"));
+  } else {
+    Log.verbose(F("Processing delay command"));
+  }
+
+  if (buffer[0] == 0) {
+    variableDutyCycle = true;
+    Log.verbose(F("Duty cycle variable"));
+  } else {
+    variableDutyCycle = false;
+    appTxDutyCycle = buffer[0] * 1000 * 5;
+    Log.verbose(F("Duty cycle %d seconds"),appTxDutyCycle / 1000);
+  }
+}
 
 void process_system_command(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
@@ -359,6 +376,9 @@ void process_system_command(unsigned char len, unsigned char *buffer) {
   switch (buffer[0]) {
     case 0x01:
       process_system_power_command(len-1,buffer+1);
+      break;
+    case 0x02:
+      process_system_delay_command(len-1,buffer+1);
       break;
     case 0x03:
       process_system_led_command(len-1,buffer+1);
