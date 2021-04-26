@@ -35,6 +35,7 @@ bool ads1115_found = false;
 
 bool setup_complete = false;
 bool pixels_initalized = false;
+bool drain_battery = false;
 
 uint16_t userChannelsMask[6]={ 0x00FF,0x0000,0x0000,0x0000,0x0000,0x0000 };
 uint8_t nwkSKey[] = { 0x15, 0xb1, 0xd0, 0xef, 0xa4, 0x63, 0xdf, 0xbe, 0x3d, 0x11, 0x18, 0x1e, 0x1e, 0xc7, 0xda,0x85 };
@@ -325,6 +326,28 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
   }
 }
 
+void process_system_power_command(unsigned char len, unsigned char *buffer) {
+  if (len == 0) {
+    Log.error(F("Zero length power command"));
+  } else {
+    Log.verbose(F("Processing power command"));
+  }
+
+  switch (buffer[0]) {
+    case 0x01:
+      drain_battery = false;
+      Log.verbose(F("Power save to default"));
+      break;
+    case 0xff:
+      drain_battery = true;
+      Log.verbose(F("Drain battery on"));
+      break;
+    default:
+      Log.error(F("Unknown power command %d"),buffer[0]);
+      break;
+  }
+}
+
 
 void process_system_command(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
@@ -334,6 +357,9 @@ void process_system_command(unsigned char len, unsigned char *buffer) {
     Log.verbose(F("Processing system command"));
   }
   switch (buffer[0]) {
+    case 0x01:
+      process_system_power_command(len-1,buffer+1);
+      break;
     case 0x03:
       process_system_led_command(len-1,buffer+1);
       break;
@@ -437,7 +463,8 @@ void loop() {
 		case DEVICE_STATE_SLEEP:
 		{
       // switch off power
-      vext_power(false);
+      if (!drain_battery)
+        vext_power(false);
 			LoRaWAN.sleep();
 			break;
 		}
