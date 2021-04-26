@@ -3,8 +3,7 @@
 #include <Wire.h>
 #include <ArduinoLog.h>
 #include "CubeCell_NeoPixel.h"
-
-
+#include "innerWdt.h"
 
 #include "cubecell.h"
 
@@ -35,6 +34,7 @@ bool gy49_found = false;
 bool ads1115_found = false;
 
 bool setup_complete = false;
+bool pixels_initalized = false;
 
 uint16_t userChannelsMask[6]={ 0x00FF,0x0000,0x0000,0x0000,0x0000,0x0000 };
 uint8_t nwkSKey[] = { 0x15, 0xb1, 0xd0, 0xef, 0xa4, 0x63, 0xdf, 0xbe, 0x3d, 0x11, 0x18, 0x1e, 0x1e, 0xc7, 0xda,0x85 };
@@ -47,7 +47,7 @@ LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t  loraWanClass = LORAWAN_CLASS;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 2*60*1000;
+uint32_t appTxDutyCycle = 1*60*1000;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = LORAWAN_NETMODE;
@@ -88,6 +88,15 @@ bool ledon = false;
 * the datarate, in case the LoRaMAC layer did not receive an acknowledgment
 */
 uint8_t confirmedNbTrials = 4;
+
+// external power functions
+void vext_power(bool on) {
+  if (on) {
+    digitalWrite(Vext,LOW);
+  } else {
+    digitalWrite(Vext,HIGH);
+  }
+}
 
 //
 // Scan for sensors
@@ -148,8 +157,23 @@ void setup_i2c() {
 }
 
 void set_led(uint8_t r, uint8_t g, uint8_t b) {
-  pixels.setPixelColor(0, pixels.Color(r,g,b));
-  pixels.show();
+  // switch on power
+  vext_power(true);
+
+  Log.verbose(F("set_led(%d,%d,%d)"),r,g,b);
+  if (!pixels_initalized){
+    pixels.begin();
+    pixels_initalized = true;
+  }
+
+  if (r == 0 && g == 0 && b == 0) {
+    pixels.clear();
+    pixels.show();
+  } else {
+    pixels.setPixelColor(0, pixels.Color(r,g,b));
+    pixels.show();
+    // delay(10*1000);
+  }
 }
 
 // BME280 routines
@@ -184,11 +208,8 @@ void read_sensors() {
   lpp.reset();
 
   // switch on power
-  digitalWrite(Vext,LOW);//set vext to high
-  if (ledon) {
-    set_led(ledr,ledg,ledb);
-    delay(1000);
-  }
+  vext_power(true);
+  set_led(ledr,ledg,ledb);
 
   delay(100);
   // initialize sensors
@@ -215,8 +236,6 @@ void read_sensors() {
   }
 #endif
 Wire.end();
-// switch off power
-digitalWrite(Vext,HIGH);//set vext to low
 
 }
 
@@ -254,18 +273,19 @@ void setup_lora() {
 
 void setup() {
   setup_serial();
-  delay(5000);
+  delay(100);
   setup_logging();
-
+  Log.verbose(F("setup(): Logging started"));
+  // Turn on watchdog
+  innerWdtEnable(true);
   // Turn on power for devices
   pinMode(Vext,OUTPUT);
-  digitalWrite(Vext,LOW);//set vext to high
+  vext_power(true);
+  set_led(ledr,ledg,ledb);
 
   setup_i2c();
   setup_lora();
 
-  pixels.begin();
-  pixels.clear();
 }
 
 static void prepareTxFrame( ) {
@@ -286,9 +306,7 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
 
   switch (buffer[0]) {
     case 0x00:
-      pixels.clear();
-      ledon = false;
-      pixels.show();
+      set_led(0,0,0);
       break;
     case 0x02:
       if (len == 4) {
@@ -296,11 +314,6 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
         ledr = buffer[1];
         ledg = buffer[2];
         ledb = buffer[3];
-        if (ledr == 0 && ledg == 0 && ledb == 0) {
-          ledon = false;
-        } else {
-          ledon = true;
-        }
         set_led(ledr,ledg,ledb);
       } else {
         Log.error(F("Missing RGB values for LED. Len = %d"),len);
@@ -423,6 +436,8 @@ void loop() {
 		}
 		case DEVICE_STATE_SLEEP:
 		{
+      // switch off power
+      vext_power(false);
 			LoRaWAN.sleep();
 			break;
 		}
