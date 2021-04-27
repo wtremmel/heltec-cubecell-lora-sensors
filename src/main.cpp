@@ -49,7 +49,7 @@ DeviceClass_t  loraWanClass = LORAWAN_CLASS;
 
 /*the application data transmission duty cycle.  value in [ms].*/
 uint32_t appTxDutyCycle = 1*60*1000;
-bool variableDutyCycle = false;
+bool variableDutyCycle = true;
 
 /*OTAA or ABP*/
 bool overTheAirActivation = LORAWAN_NETMODE;
@@ -203,6 +203,20 @@ void read_voltage() {
   uint16_t v = getBatteryVoltage();
   lpp.addAnalogInput(5,(float)v / 1000.0);
   Log.verbose(F("Voltage: %d"),v);
+  if (variableDutyCycle) {
+    // duty cycle depending on voltage
+    // max duty cycle = 4 minutes
+    // min duty cycle = 1 minute
+
+    // ((t2-t1)/(v2-v1))*(v-v1)+t1
+    appTxDutyCycle = ((6000 - 240000)/(3900-3600)) * (v - 3600) + 240000;
+    if (appTxDutyCycle < 60000)
+      appTxDutyCycle = 60000;
+    else if (appTxDutyCycle > 240000)
+      appTxDutyCycle = 240000;
+
+    Log.verbose(F("Duty cycle: %d s"),int(appTxDutyCycle / 1000));
+  }
 }
 
 // Sensor routines
