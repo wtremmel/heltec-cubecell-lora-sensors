@@ -32,6 +32,7 @@ bool bme280_found = false;
 bool voltage_found = true;
 bool gy49_found = false;
 bool ads1115_found = false;
+bool ads1115_initialized = false;
 
 bool setup_complete = false;
 bool pixels_initalized = false;
@@ -134,9 +135,14 @@ void setup_i2c() {
 
     if (address == 0x48) {
       // AD-converter
-      ads1115.begin();
-      ads1115_found = true;
       Log.notice(F("ADS1115 found at 0x%x"),address);
+      if (!ads1115_initialized) {
+        // initialize only once as it comsumes memory
+        Log.notice(F("ADS1115 initialized"));
+        ads1115.begin();
+        ads1115_initialized = true;
+      }
+      ads1115_found = true;
     }
 
     if (address == 0x4a) {
@@ -205,11 +211,13 @@ void read_voltage() {
   Log.verbose(F("Voltage: %d"),v);
   if (variableDutyCycle) {
     // duty cycle depending on voltage
-    // max duty cycle = 4 minutes
-    // min duty cycle = 1 minute
+    // max duty cycle = 4 minutes = 240000
+    // min duty cycle = 1 minute = 6000
+    // min voltage = 3500
+    // max voltage = 3900
 
     // ((t2-t1)/(v2-v1))*(v-v1)+t1
-    appTxDutyCycle = ((6000 - 240000)/(3900-3600)) * (v - 3600) + 240000;
+    appTxDutyCycle = ((6000 - 240000)/(3900-3500)) * (v - 3500) + 240000;
     if (appTxDutyCycle < 60000)
       appTxDutyCycle = 60000;
     else if (appTxDutyCycle > 240000)
