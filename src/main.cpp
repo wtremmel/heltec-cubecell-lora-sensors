@@ -18,6 +18,9 @@ CayenneLPP lpp(51);
 
 #include <Max44009.h>
 
+// Power management parameters
+#define SHUTDOWN_VOLTAGE 2600
+#define RESTART_VOLTAGE 3000
 
 // Global Objects
 Adafruit_Si7021 si7021;
@@ -209,15 +212,21 @@ void read_voltage() {
   uint16_t v = getBatteryVoltage();
   lpp.addAnalogInput(5,(float)v / 1000.0);
   Log.verbose(F("Voltage: %d"),v);
+  if (v < SHUTDOWN_VOLTAGE) {
+    // reboot
+    Log.notice(F("Voltage %d < Shutdown voltage (%d), shutting down"),v,SHUTDOWN_VOLTAGE);
+    delay(100);
+    HW_Reset(0);
+  }
   if (variableDutyCycle) {
     // duty cycle depending on voltage
     // max duty cycle = 4 minutes = 240000
     // min duty cycle = 1 minute = 6000
-    // min voltage = 3500
+    // min voltage = 3000
     // max voltage = 3900
 
     // ((t2-t1)/(v2-v1))*(v-v1)+t1
-    appTxDutyCycle = ((6000 - 240000)/(3900-3500)) * (v - 3500) + 240000;
+    appTxDutyCycle = ((6000 - 240000)/(3900-3000)) * (v - 3000) + 240000;
     if (appTxDutyCycle < 60000)
       appTxDutyCycle = 60000;
     else if (appTxDutyCycle > 240000)
@@ -295,13 +304,27 @@ void setup_lora() {
 	LoRaWAN.ifskipjoin();
 }
 
+void setup_check_voltage() {
+  // Check if voltage is above RESTART_VOLTAGE
+  uint16_t v = getBatteryVoltage();
+  Log.verbose(F("Voltage: %d"),v);
+  if (v < RESTART_VOLTAGE) {
+    // reboot
+    Log.notice(F("Voltage %d < Restart voltage (%d), deep sleep"),v,RESTART_VOLTAGE);
+
+  }
+}
+
 void setup() {
+  // Turn on watchdog
+  innerWdtEnable(true);
+
   setup_serial();
   delay(100);
   setup_logging();
   Log.verbose(F("setup(): Logging started"));
-  // Turn on watchdog
-  innerWdtEnable(true);
+  setup_check_voltage();
+
   // Turn on power for devices
   pinMode(Vext,OUTPUT);
   vext_power(true);
