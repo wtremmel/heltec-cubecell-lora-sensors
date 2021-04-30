@@ -21,6 +21,11 @@ CayenneLPP lpp(51);
 // Power management parameters
 #define SHUTDOWN_VOLTAGE 2600
 #define RESTART_VOLTAGE 3000
+#define HIBERNATION_SLEEPTIME 60*1000*5
+uint16_t lastV = 0;
+bool hibernationMode = false;
+uint32_t last_cycle = HIBERNATION_SLEEPTIME;
+
 
 // Global Objects
 Adafruit_Si7021 si7021;
@@ -97,7 +102,7 @@ uint8_t confirmedNbTrials = 4;
 
 // external power functions
 void vext_power(bool on) {
-  if (on) {
+  if (on && !hibernationMode) {
     digitalWrite(Vext,LOW);
   } else {
     digitalWrite(Vext,HIGH);
@@ -212,13 +217,29 @@ void read_voltage() {
   uint16_t v = getBatteryVoltage();
   lpp.addAnalogInput(5,(float)v / 1000.0);
   Log.verbose(F("Voltage: %d"),v);
-  if (v < SHUTDOWN_VOLTAGE) {
-    // reboot
-    Log.notice(F("Voltage %d < Shutdown voltage (%d), shutting down"),v,SHUTDOWN_VOLTAGE);
-    delay(100);
-    HW_Reset(0);
+  if (!hibernationMode && v <= SHUTDOWN_VOLTAGE) {
+    hibernationMode = true;
+    Log.notice(F("Voltage %d < Shutdown voltage (%d), hibernation mode"),v,SHUTDOWN_VOLTAGE);
+    vext_power(false);
+    last_cycle = appTxDutyCycle;
+    appTxDutyCycle = HIBERNATION_SLEEPTIME;
+    lastV = v;
+    drain_battery = false;
   }
-  if (variableDutyCycle) {
+  if (hibernationMode && v >= RESTART_VOLTAGE) {
+    hibernationMode = false;
+    appTxDutyCycle = last_cycle;
+  }
+
+  if (hibernationMode) {
+    if (v < lastV)
+      appTxDutyCycle += HIBERNATION_SLEEPTIME;
+    if (v > lastV)
+      appTxDutyCycle = HIBERNATION_SLEEPTIME;
+
+    lastV = v;
+  }
+  else if (variableDutyCycle) {
     // duty cycle depending on voltage
     // max duty cycle = 4 minutes = 240000
     // min duty cycle = 1 minute = 6000
@@ -245,31 +266,27 @@ void read_sensors() {
   set_led(ledr,ledg,ledb);
 
   delay(100);
-  // initialize sensors
-  setup_i2c();
 
-  if (bme280_found) {
-    read_bme280();
-  }
-  if (gy49_found) {
-    read_gy49();
-  }
-  if (ads1115_found) {
-    read_ads1115();
-  }
   if (voltage_found) {
     read_voltage();
   }
-#if 0
-  if (si7021_found) {
-    read_si7021();
-  }
-  if (tsl2561_found) {
-    read_tsl2561();
-  }
-#endif
-Wire.end();
 
+  // initialize sensors
+
+  if (!hibernationMode) {
+    setup_i2c();
+
+    if (bme280_found) {
+      read_bme280();
+    }
+    if (gy49_found) {
+      read_gy49();
+    }
+    if (ads1115_found) {
+      read_ads1115();
+    }
+    Wire.end();
+  }
 }
 
 void setup_serial() {
@@ -308,11 +325,7 @@ void setup_check_voltage() {
   // Check if voltage is above RESTART_VOLTAGE
   uint16_t v = getBatteryVoltage();
   Log.verbose(F("Voltage: %d"),v);
-  if (v < RESTART_VOLTAGE) {
-    // reboot
-    Log.notice(F("Voltage %d < Restart voltage (%d), deep sleep"),v,RESTART_VOLTAGE);
 
-  }
 }
 
 void setup() {
