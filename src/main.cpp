@@ -109,6 +109,53 @@ void vext_power(bool on) {
   }
 }
 
+void set_led(uint8_t r, uint8_t g, uint8_t b) {
+  // switch on power
+  vext_power(true);
+
+  Log.verbose(F("set_led(%d,%d,%d)"),r,g,b);
+  if (!pixels_initalized){
+    pixels.begin();
+    pixels_initalized = true;
+  }
+
+  if (r == 0 && g == 0 && b == 0) {
+    pixels.clear();
+    pixels.show();
+  } else {
+    pixels.setPixelColor(0, pixels.Color(r,g,b));
+    pixels.show();
+    // delay(10*1000);
+  }
+}
+
+
+void set_hibernation(bool on) {
+  if (on) {
+    if (!hibernationMode) {
+    hibernationMode = true;
+    Log.notice(F("Hibernation mode now on"));
+    set_led(0,0,0);
+    vext_power(false);
+    appTxDutyCycle = HIBERNATION_SLEEPTIME;
+    drain_battery = false;
+    variableDutyCycle = false;
+    } else {
+      Log.verbose(F("Hibernation mode already on, doing nothing"));
+    }
+  } else {
+    if (hibernationMode) {
+      hibernationMode = false;
+      appTxDutyCycle = HIBERNATION_SLEEPTIME;
+      variableDutyCycle = true;
+      vext_power(true);
+      Log.notice(F("Hibernation mode now off"));
+    } else {
+      Log.verbose(F("Hibernation mode already off, doing nothing"));
+    }
+  }
+}
+
 //
 // Scan for sensors
 //
@@ -172,25 +219,6 @@ void setup_i2c() {
   Log.verbose(F("i2c bus scanning complete, %d devices"),devices);
 }
 
-void set_led(uint8_t r, uint8_t g, uint8_t b) {
-  // switch on power
-  vext_power(true);
-
-  Log.verbose(F("set_led(%d,%d,%d)"),r,g,b);
-  if (!pixels_initalized){
-    pixels.begin();
-    pixels_initalized = true;
-  }
-
-  if (r == 0 && g == 0 && b == 0) {
-    pixels.clear();
-    pixels.show();
-  } else {
-    pixels.setPixelColor(0, pixels.Color(r,g,b));
-    pixels.show();
-    // delay(10*1000);
-  }
-}
 
 // BME280 routines
 void read_bme280() {
@@ -220,15 +248,11 @@ void read_voltage() {
   if (!hibernationMode && v <= SHUTDOWN_VOLTAGE) {
     hibernationMode = true;
     Log.notice(F("Voltage %d < Shutdown voltage (%d), hibernation mode"),v,SHUTDOWN_VOLTAGE);
-    vext_power(false);
-    last_cycle = appTxDutyCycle;
-    appTxDutyCycle = HIBERNATION_SLEEPTIME;
+    set_hibernation(true);
     lastV = v;
-    drain_battery = false;
   }
   if (hibernationMode && v >= RESTART_VOLTAGE) {
-    hibernationMode = false;
-    appTxDutyCycle = last_cycle;
+    set_hibernation(false);
   }
 
   if (hibernationMode) {
@@ -333,7 +357,7 @@ void setup() {
   innerWdtEnable(true);
 
   setup_serial();
-  delay(100);
+  delay(5000);
   setup_logging();
   Log.verbose(F("setup(): Logging started"));
   setup_check_voltage();
@@ -396,6 +420,12 @@ void process_system_power_command(unsigned char len, unsigned char *buffer) {
     case 0x01:
       drain_battery = false;
       Log.verbose(F("Power save to default"));
+      break;
+    case 0x10:
+      set_hibernation(true);
+      break;
+    case 0x11:
+      set_hibernation(false);
       break;
     case 0xff:
       drain_battery = true;
