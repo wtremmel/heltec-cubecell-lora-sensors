@@ -246,7 +246,6 @@ void read_voltage() {
   lpp.addAnalogInput(5,(float)v / 1000.0);
   Log.verbose(F("Voltage: %d"),v);
   if (!hibernationMode && v <= SHUTDOWN_VOLTAGE) {
-    hibernationMode = true;
     Log.notice(F("Voltage %d < Shutdown voltage (%d), hibernation mode"),v,SHUTDOWN_VOLTAGE);
     set_hibernation(true);
     lastV = v;
