@@ -19,9 +19,14 @@ CayenneLPP lpp(51);
 #include <Max44009.h>
 
 // Power management parameters
-#define SHUTDOWN_VOLTAGE 2600
-#define RESTART_VOLTAGE 3000
-#define HIBERNATION_SLEEPTIME 60*1000*5
+#define SHUTDOWN_VOLTAGE 2600 // 2.6V
+#define RESTART_VOLTAGE 3000  // 3.0V
+#define HIBERNATION_SLEEPTIME 60*1000*5  // 5 minutes
+#define CYCLE_MIN  60000  // 1 minute
+#define CYCLE_MAX 240000  // 4 minutes
+#define VOLTAGE_MAX 3900  // 3.9V
+#define VOLTAGE_MIN 3000  // 3.0V
+
 uint16_t lastV = 0;
 bool hibernationMode = false;
 uint32_t last_cycle = HIBERNATION_SLEEPTIME;
@@ -177,7 +182,7 @@ void setup_i2c() {
 
   Log.verbose("Scanning i2c bus");
   Wire.begin();
-  // Wire.setClock(10000);
+  Wire.setClock(5000);
   for(address = 1; address < 127; address++ ) {
     Log.verbose(F("Trying 0x%x"),address);
     Wire.beginTransmission(address);
@@ -186,35 +191,34 @@ void setup_i2c() {
     if (error == 0) {
       Log.verbose(F("I2C device found at address 0x%x !"),address);
       devices++;
-    }
 
-    if (address == 0x48) {
-      // AD-converter
-      Log.notice(F("ADS1115 found at 0x%x"),address);
-      if (!ads1115_initialized) {
-        // initialize only once as it comsumes memory
-        Log.notice(F("ADS1115 initialized"));
-        ads1115.begin();
-        ads1115_initialized = true;
+      if (address == 0x48) {
+        // AD-converter
+        Log.notice(F("ADS1115 found at 0x%x"),address);
+        if (!ads1115_initialized) {
+          // initialize only once as it comsumes memory
+          Log.notice(F("ADS1115 initialized"));
+          ads1115.begin();
+          ads1115_initialized = true;
+        }
+        ads1115_found = true;
       }
-      ads1115_found = true;
-    }
 
-    if (address == 0x4a) {
-      // GY-49
-      float l = gy49.getLux();
-      if (! gy49.getError()) {
-        gy49_found = true;
-        Log.notice(F("GY49 found at 0x%x, current Lux %F"),address,l);
+      if (address == 0x4a) {
+        // GY-49
+        float l = gy49.getLux();
+        if (! gy49.getError()) {
+          gy49_found = true;
+          Log.notice(F("GY49 found at 0x%x, current Lux %F"),address,l);
+        }
+      }
+
+      if (address == 0x76) {
+        // BME280
+        bme280_found = bme280.begin(address);
+        Log.verbose(F("BME280 found? %T"),bme280_found);
       }
     }
-
-    if (address == 0x76) {
-      // BME280
-      bme280_found = bme280.begin(address);
-      Log.verbose(F("BME280 found? %T"),bme280_found);
-    }
-
   }
   Log.verbose(F("i2c bus scanning complete, %d devices"),devices);
 }
@@ -265,16 +269,19 @@ void read_voltage() {
   else if (variableDutyCycle) {
     // duty cycle depending on voltage
     // max duty cycle = 4 minutes = 240000
-    // min duty cycle = 1 minute = 6000
+    // min duty cycle = 1 minute = 60000
     // min voltage = 3000
     // max voltage = 3900
 
+
     // ((t2-t1)/(v2-v1))*(v-v1)+t1
-    appTxDutyCycle = ((6000 - 240000)/(3900-3000)) * (v - 3000) + 240000;
-    if (appTxDutyCycle < 60000)
-      appTxDutyCycle = 60000;
-    else if (appTxDutyCycle > 240000)
-      appTxDutyCycle = 240000;
+    long int cycle = ((CYCLE_MIN - CYCLE_MAX)/(VOLTAGE_MAX-VOLTAGE_MIN)) * (v - VOLTAGE_MIN) + CYCLE_MAX;
+    if (cycle < CYCLE_MIN)
+      appTxDutyCycle = CYCLE_MIN;
+    else if (cycle > CYCLE_MAX)
+      appTxDutyCycle = CYCLE_MAX;
+    else
+      appTxDutyCycle = abs(cycle);
 
     Log.verbose(F("Duty cycle: %d s"),int(appTxDutyCycle / 1000));
   }
