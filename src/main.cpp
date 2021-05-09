@@ -395,7 +395,16 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
 
   switch (buffer[0]) {
     case 0x00:
+      ledr = 0;
+      ledg = 0;
+      ledb = 0;
       set_led(0,0,0);
+      break;
+    case 0x01:
+      ledr = 255;
+      ledg = 255;
+      ledb = 255;
+      set_led(255,255,255);
       break;
     case 0x02:
       if (len == 4) {
