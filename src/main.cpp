@@ -62,7 +62,7 @@ LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t  loraWanClass = LORAWAN_CLASS;
 
 /*the application data transmission duty cycle.  value in [ms].*/
-uint32_t appTxDutyCycle = 1*60*1000;
+uint32_t appTxDutyCycle = CYCLE_MIN;
 bool variableDutyCycle = true;
 
 /*OTAA or ABP*/
@@ -182,7 +182,6 @@ void setup_i2c() {
 
   Log.verbose("Scanning i2c bus");
   Wire.begin();
-  Wire.setClock(5000);
   for(address = 1; address < 127; address++ ) {
     Log.verbose(F("Trying 0x%x"),address);
     Wire.beginTransmission(address);
