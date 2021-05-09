@@ -6,3 +6,5 @@
 ._*
 pio.map
 src/cubecell.h
+*.FCStd1
+.DS_Store
