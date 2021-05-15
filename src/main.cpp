@@ -357,6 +357,12 @@ void setup_check_voltage() {
 
 }
 
+void setup_chipid() {
+  uint64_t chipID=getID();
+  Log.notice(F("Chip ID = %X%x"),
+    (uint32_t)(chipID>>32),(uint32_t)chipID);
+}
+
 void setup() {
   // Turn on watchdog
   innerWdtEnable(true);
@@ -365,6 +371,7 @@ void setup() {
   delay(5000);
   setup_logging();
   Log.verbose(F("setup(): Logging started"));
+  setup_chipid();
   setup_check_voltage();
 
   // Turn on power for devices
