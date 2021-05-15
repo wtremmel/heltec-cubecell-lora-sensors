@@ -60,3 +60,8 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
   * `0x01 0x00` - set default (device dependent)
 * `0x20` - send all queued
 * `0x21` - send all in delete queue
+
+### Display commands - (Byte 0 == 0x03)
+* `0x00` - display off
+* `0x01` - display default content
+* `0x02 <message>` - display message
