@@ -18,8 +18,17 @@ CayenneLPP lpp(51);
 
 #include <Max44009.h>
 
-// Power management parameters
+#if defined(CubeCell_HalfAA)
+#define BATTERY_RECHARGABLE 0
+#define HAS_RGB 0
+#define SHUTDOWN_VOLTAGE 0 // no shutdown
+#else
+#define BATTERY_RECHARGABLE 1
+#define HAS_RGB 1
 #define SHUTDOWN_VOLTAGE 2600 // 2.6V
+#endif
+
+// Power management parameters
 #define RESTART_VOLTAGE 3000  // 3.0V
 #define HIBERNATION_SLEEPTIME 60*1000*5  // 5 minutes
 #define CYCLE_MIN  60000  // 1 minute
@@ -37,7 +46,9 @@ Adafruit_Si7021 si7021;
 Max44009 gy49(0x4a);
 Adafruit_BME280 bme280;
 Adafruit_TSL2561_Unified tsl2561 = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT);
+#if HAS_RGB
 CubeCell_NeoPixel pixels(1, RGB, NEO_GRB + NEO_KHZ800);
+#endif
 Adafruit_ADS1115 ads1115;
 
 
@@ -62,9 +73,13 @@ LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 DeviceClass_t  loraWanClass = LORAWAN_CLASS;
 
 /*the application data transmission duty cycle.  value in [ms].*/
+#if BATTERY_RECHARGABLE
 uint32_t appTxDutyCycle = CYCLE_MIN;
 bool variableDutyCycle = true;
-
+#else
+uint32_t appTxDutyCycle = CYCLE_MAX;
+bool variableDutyCycle = false;
+#endif
 /*OTAA or ABP*/
 bool overTheAirActivation = LORAWAN_NETMODE;
 
@@ -85,7 +100,7 @@ bool ledon = false;
 
 /*!
 * Number of trials to transmit the frame, if the LoRaMAC layer did not
-* receive an acknowledgment. The MAC performs a datarate adaptation,
+* receive an acknowgment. The MAC performs a datarate adaptation,
 * according to the LoRaWAN Specification V1.0.2, chapter 18.4, according
 * to the following table:
 *
@@ -116,6 +131,7 @@ void vext_power(bool on) {
 
 void set_led(uint8_t r, uint8_t g, uint8_t b) {
   // switch on power
+#if HAS_RGB
   vext_power(true);
 
   Log.verbose(F("set_led(%d,%d,%d)"),r,g,b);
@@ -132,6 +148,7 @@ void set_led(uint8_t r, uint8_t g, uint8_t b) {
     pixels.show();
     // delay(10*1000);
   }
+#endif
 }
 
 
@@ -413,6 +430,7 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
       ledb = 255;
       set_led(255,255,255);
       break;
+#if HAS_RGB
     case 0x02:
       if (len == 4) {
         // do rgb magic
@@ -424,6 +442,7 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
         Log.error(F("Missing RGB values for LED. Len = %d"),len);
       }
       break;
+#endif
     default:
       Log.error(F("Unknown LED command %d"), buffer[0]);
       break;
@@ -448,10 +467,12 @@ void process_system_power_command(unsigned char len, unsigned char *buffer) {
     case 0x11:
       set_hibernation(false);
       break;
+#if !BATTERY_RECHARGABLE
     case 0xff:
       drain_battery = true;
       Log.verbose(F("Drain battery on"));
       break;
+#endif
     default:
       Log.error(F("Unknown power command %d"),buffer[0]);
       break;
@@ -466,8 +487,10 @@ void process_system_delay_command(unsigned char len, unsigned char *buffer) {
   }
 
   if (buffer[0] == 0) {
+#if !BATTERY_RECHARGABLE
     variableDutyCycle = true;
     Log.verbose(F("Duty cycle variable"));
+#endif
   } else {
     variableDutyCycle = false;
     appTxDutyCycle = buffer[0] * 1000 * 5;
