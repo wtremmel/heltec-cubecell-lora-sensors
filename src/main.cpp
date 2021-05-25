@@ -35,14 +35,18 @@ CayenneLPP lpp(51);
 #define HAS_RGB 1
 
 #define SHUTDOWN_VOLTAGE 3000 // 2.8V
-#define RESTART_VOLTAGE 3100  // 3.0V
+#define RESTART_VOLTAGE 3200  // 3.0V
 #define HIBERNATION_SLEEPTIME 60*1000*20  // 20 minutes
 #define CYCLE_MIN  2*60*1000  // 2 minute
-#define CYCLE_MAX 60*60*1000  // 1 hour
+#define CYCLE_MAX HIBERNATION_SLEEPTIME  // 1 hour
 #define VOLTAGE_MAX 3800  // 3.9V
-#define VOLTAGE_MIN 3000  // 3.0V
+#define VOLTAGE_MIN RESTART_VOLTAGE  // 3.0V
 
 #endif
+
+
+// #define LOGLEVEL LOG_LEVEL_VERBOSE
+#define LOGLEVEL LOG_LEVEL_SILENT
 
 uint32_t cycle_min = CYCLE_MIN,
   cycle_max = CYCLE_MAX,
@@ -176,7 +180,7 @@ void set_hibernation(bool on) {
     Log.notice(F("Hibernation mode now on"));
     set_led(0,0,0);
     vext_power(false);
-    appTxDutyCycle = HIBERNATION_SLEEPTIME;
+    appTxDutyCycle = hibernation_sleeptime;
     drain_battery = false;
     variableDutyCycle = false;
     } else {
@@ -185,7 +189,7 @@ void set_hibernation(bool on) {
   } else {
     if (hibernationMode) {
       hibernationMode = false;
-      appTxDutyCycle = HIBERNATION_SLEEPTIME;
+      appTxDutyCycle = hibernation_sleeptime;
       variableDutyCycle = true;
       vext_power(true);
       Log.notice(F("Hibernation mode now off"));
@@ -193,6 +197,8 @@ void set_hibernation(bool on) {
       Log.verbose(F("Hibernation mode already off, doing nothing"));
     }
   }
+  Log.verbose(F("set_hibernation: Duty cycle: %d s"),int(appTxDutyCycle / 1000));
+
 }
 
 //
@@ -277,27 +283,41 @@ void read_ads1115() {
   }
 }
 
+void print_timer_values() {
+  Log.verbose(F("cycle_min = %d"),cycle_min);
+  Log.verbose(F("cycle_max = %d"),cycle_max);
+  Log.verbose(F("hibernation_sleeptime = %d"),hibernation_sleeptime);
+  Log.verbose(F("voltage_min = %d"),voltage_min);
+  Log.verbose(F("voltage_max = %d"),voltage_max);
+  Log.verbose(F("shutdown_voltage = %d"),shutdown_voltage);
+  Log.verbose(F("restart_voltage = %d"),restart_voltage);
+  Log.verbose(F("Duty cycle: %d s"),int(appTxDutyCycle / 1000));
+
+}
+
 // Battery voltage
 void read_voltage() {
   uint16_t v = getBatteryVoltage();
   lpp.addAnalogInput(5,(float)v / 1000.0);
   Log.verbose(F("Voltage: %d"),v);
-  if (!hibernationMode && v <= SHUTDOWN_VOLTAGE) {
-    Log.notice(F("Voltage %d < Shutdown voltage (%d), hibernation mode"),v,SHUTDOWN_VOLTAGE);
+  if (!hibernationMode && v <= shutdown_voltage) {
+    Log.notice(F("Voltage %d <= Shutdown voltage (%d), hibernation mode"),v,shutdown_voltage);
     set_hibernation(true);
     lastV = v;
   }
-  if (hibernationMode && v >= RESTART_VOLTAGE) {
+  if (hibernationMode && v >= restart_voltage) {
     set_hibernation(false);
   }
 
   if (hibernationMode) {
     if (v < lastV)
-      appTxDutyCycle += HIBERNATION_SLEEPTIME;
+      appTxDutyCycle += hibernation_sleeptime;
     if (v > lastV)
-      appTxDutyCycle = HIBERNATION_SLEEPTIME;
+      appTxDutyCycle = hibernation_sleeptime;
 
     lastV = v;
+    Log.verbose(F("read_voltage: Duty cycle: %d s"),int(appTxDutyCycle / 1000));
+
   }
   else if (variableDutyCycle) {
     // duty cycle depending on voltage
@@ -308,15 +328,21 @@ void read_voltage() {
 
 
     // ((t2-t1)/(v2-v1))*(v-v1)+t1
-    long int cycle = ((CYCLE_MIN - CYCLE_MAX)/(VOLTAGE_MAX-VOLTAGE_MIN)) * (v - VOLTAGE_MIN) + CYCLE_MAX;
-    if (cycle < CYCLE_MIN)
-      appTxDutyCycle = CYCLE_MIN;
-    else if (cycle > CYCLE_MAX)
-      appTxDutyCycle = CYCLE_MAX;
+    long int cycle = (((long)cycle_min - (long)cycle_max)/
+      ((long)voltage_max-(long)voltage_min)) *
+      (v - (long)voltage_min) + (long)cycle_max;
+
+    print_timer_values();
+    Log.verbose(F("cycle = %d"),cycle);
+
+    if (cycle < (long int)cycle_min)
+      appTxDutyCycle = cycle_min;
+    else if (cycle > (long int)cycle_max)
+      appTxDutyCycle = cycle_max;
     else
       appTxDutyCycle = abs(cycle);
 
-    Log.verbose(F("Duty cycle: %d s"),int(appTxDutyCycle / 1000));
+    Log.verbose(F("read_voltage2: Duty cycle: %d s"),int(appTxDutyCycle / 1000));
   }
 }
 
@@ -352,6 +378,8 @@ void read_sensors() {
   }
 }
 
+
+
 void setup_serial() {
   Serial.begin(115200);
 #if DEBUG
@@ -362,8 +390,9 @@ void setup_serial() {
 
 // Logging helper routines
 void printTimestamp(Print* _logOutput) {
-  char c[12];
-  sprintf(c, "%10lu ", TimerGetCurrentTime());
+  static char c[12];
+  // sprintf(c, "%l ", TimerGetCurrentTime());
+  sprintf(c, "%d ", millis());
   _logOutput->print(c);
 }
 
@@ -372,7 +401,7 @@ void printNewline(Print* _logOutput) {
 }
 
 void setup_logging() {
-  Log.begin(LOG_LEVEL_VERBOSE, &Serial);
+  Log.begin(LOGLEVEL, &Serial);
   Log.setPrefix(printTimestamp);
   Log.setSuffix(printNewline);
   Log.verbose("Logging has started");
@@ -385,10 +414,12 @@ void setup_lora() {
 }
 
 void setup_check_voltage() {
-  // Check if voltage is above RESTART_VOLTAGE
+  // Check if voltage is above restart_voltage
   uint16_t v = getBatteryVoltage();
   Log.verbose(F("Voltage: %d"),v);
-
+  if (v <= shutdown_voltage) {
+    set_hibernation(true);
+  }
 }
 
 void setup_chipid() {
@@ -415,7 +446,7 @@ void setup() {
 
   setup_i2c();
   setup_lora();
-
+  print_timer_values();
 }
 
 static void prepareTxFrame( ) {
@@ -506,6 +537,8 @@ void set_default_timers() {
   hibernation_sleeptime = HIBERNATION_SLEEPTIME;
 }
 
+
+
 void process_system_delay_command(unsigned char len, unsigned char *buffer) {
   if (len != 1) {
     Log.error(F("Len of delay command != 1"));
@@ -527,14 +560,60 @@ void process_system_delay_command(unsigned char len, unsigned char *buffer) {
 
 void process_system_timer_command(unsigned char len, unsigned char *buffer) {
   if (len <= 1) {
-    Log.error(F("Len of delay command <= 1"));
+    Log.error(F("Len of timer command <= 1"));
   } else {
     Log.verbose(F("Processing timer command"));
   }
 
   switch(buffer[0]){
-
+    case 0x00:
+      set_default_timers();
+      break;
+    case 0x01:
+      cycle_min = 60*1000*buffer[1];
+      break;
+    case 0x02:
+      cycle_max = 60*1000*buffer[1];
+      break;
+    case 0x03:
+      hibernation_sleeptime = 60*1000*buffer[1];
+      break;
+    case 0x11:
+      voltage_min = 100 * buffer[1];
+      break;
+    case 0x12:
+      voltage_max = 100 * buffer[1];
+      break;
+    case 0x13:
+      shutdown_voltage = 100 * buffer[1];
+      break;
+    case 0x14:
+      restart_voltage = 100 * buffer[1];
+      break;
+    case 0xff:
+      if (len == 7) {
+        cycle_min = 60*1000*buffer[1];
+        cycle_max = 60*1000*buffer[1];
+        hibernation_sleeptime = 60*1000*buffer[1];
+        voltage_min = 100 * buffer[1];
+        voltage_max = 100 * buffer[1];
+        shutdown_voltage = 100 * buffer[1];
+        restart_voltage = 100 * buffer[1];
+      } else {
+        Log.error(F("Only %d arguments, needed 7"),len);
+      }
+      break;
+    default:
+      Log.error(F("Unknown timer command %X"),buffer[0]);
   }
+  // sanity Check
+  if (cycle_min > cycle_max ||
+    voltage_min >= voltage_max ||
+    shutdown_voltage > restart_voltage) {
+      Log.error(F("Sanity check failed, loading defaults"));
+      set_default_timers();
+    }
+  print_timer_values();
 }
 
 void process_system_command(unsigned char len, unsigned char *buffer) {
@@ -649,7 +728,10 @@ void loop() {
 		case DEVICE_STATE_CYCLE:
 		{
 			// Schedule next packet transmission
-			txDutyCycleTime = appTxDutyCycle + randr( 0, APP_TX_DUTYCYCLE_RND );
+			txDutyCycleTime = appTxDutyCycle;
+      Log.verbose(F("DEVICE_STATE_CYCLE: Duty cycle: %d s"),int(appTxDutyCycle / 1000));
+
+
 			LoRaWAN.cycle(txDutyCycleTime);
 			deviceState = DEVICE_STATE_SLEEP;
 			break;
@@ -659,6 +741,8 @@ void loop() {
       // switch off power
       if (!drain_battery)
         vext_power(false);
+      // Log.verbose(F("Sleeping - txDutyCycleTime = %d"),txDutyCycleTime);
+      // delay(10);
 			LoRaWAN.sleep();
 			break;
 		}
