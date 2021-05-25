@@ -22,19 +22,36 @@ CayenneLPP lpp(51);
 #define BATTERY_RECHARGABLE 0
 #define HAS_RGB 0
 #define SHUTDOWN_VOLTAGE 0 // no shutdown
-#else
-#define BATTERY_RECHARGABLE 1
-#define HAS_RGB 1
-#define SHUTDOWN_VOLTAGE 2600 // 2.6V
-#endif
 
-// Power management parameters
 #define RESTART_VOLTAGE 3000  // 3.0V
 #define HIBERNATION_SLEEPTIME 60*1000*5  // 5 minutes
 #define CYCLE_MIN  60000  // 1 minute
 #define CYCLE_MAX 240000  // 4 minutes
 #define VOLTAGE_MAX 3900  // 3.9V
 #define VOLTAGE_MIN 3000  // 3.0V
+
+#else
+#define BATTERY_RECHARGABLE 1
+#define HAS_RGB 1
+
+#define SHUTDOWN_VOLTAGE 3000 // 2.8V
+#define RESTART_VOLTAGE 3100  // 3.0V
+#define HIBERNATION_SLEEPTIME 60*1000*20  // 20 minutes
+#define CYCLE_MIN  2*60*1000  // 2 minute
+#define CYCLE_MAX 60*60*1000  // 1 hour
+#define VOLTAGE_MAX 3800  // 3.9V
+#define VOLTAGE_MIN 3000  // 3.0V
+
+#endif
+
+uint32_t cycle_min = CYCLE_MIN,
+  cycle_max = CYCLE_MAX,
+  voltage_min = VOLTAGE_MIN,
+  voltage_max = VOLTAGE_MAX,
+  restart_voltage = RESTART_VOLTAGE,
+  shutdown_voltage = SHUTDOWN_VOLTAGE,
+  hibernation_sleeptime = HIBERNATION_SLEEPTIME;
+
 
 uint16_t lastV = 0;
 bool hibernationMode = false;
@@ -479,6 +496,16 @@ void process_system_power_command(unsigned char len, unsigned char *buffer) {
   }
 }
 
+void set_default_timers() {
+  cycle_min = CYCLE_MIN;
+  cycle_max = CYCLE_MAX;
+  voltage_min = VOLTAGE_MIN;
+  voltage_max = VOLTAGE_MAX;
+  restart_voltage = RESTART_VOLTAGE;
+  shutdown_voltage = SHUTDOWN_VOLTAGE;
+  hibernation_sleeptime = HIBERNATION_SLEEPTIME;
+}
+
 void process_system_delay_command(unsigned char len, unsigned char *buffer) {
   if (len != 1) {
     Log.error(F("Len of delay command != 1"));
@@ -498,6 +525,18 @@ void process_system_delay_command(unsigned char len, unsigned char *buffer) {
   }
 }
 
+void process_system_timer_command(unsigned char len, unsigned char *buffer) {
+  if (len <= 1) {
+    Log.error(F("Len of delay command <= 1"));
+  } else {
+    Log.verbose(F("Processing timer command"));
+  }
+
+  switch(buffer[0]){
+
+  }
+}
+
 void process_system_command(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
     Log.error(F("Zero length system command"));
@@ -514,6 +553,9 @@ void process_system_command(unsigned char len, unsigned char *buffer) {
       break;
     case 0x03:
       process_system_led_command(len-1,buffer+1);
+      break;
+    case 0x08:
+      process_system_timer_command(len-1,buffer+1);
       break;
     case 0xff:
       // Reboots

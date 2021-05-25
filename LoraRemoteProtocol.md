@@ -29,7 +29,7 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
   * `0x01 0x10` hibernation on
   * `0x01 0x11` hibernation off
   * `0x01 0xff` drain battery (implementation specific)
-* 0x02 - Delay time. Argument is delay in seconds times 5. So `0x02 0x0c` is 60 seconds delay/sleep between measurements. `0x02 0x00` is variable delay (default)
+* `0x02` - Delay time. Argument is delay in seconds times 5. So `0x02 0x0c` is 60 seconds delay/sleep between measurements. `0x02 0x00` is variable delay (default)
 * `0x03` - LED usage.
   * `0x03 0x00` - LED off (default)
   * `0x03 0x01` - LED on
@@ -39,6 +39,16 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
 * `0x05 <hours> <minutes> <seconds>` - sleep now for some time (one byte each)
 * `0x06 0x00000000` - sleep now for seconds
 * `0x07` - garbage collection (free mem). Also sends message with free memory in slot 7.
+* `0x08` - set timing parameters.
+  * `0x08 0x00` - set all values to default
+  * `0x08 0x01 mm ss` - set minimum cycle time to mm:ss minutes:seconds
+  * `0x08 0x02 mm ss` - set maximum cycle time to mm:ss minutes:seconds
+  * `0x08 0x03 vv` - set min voltage to v.v V
+  * `0x08 0x04 vv` - set max voltage to v.v V
+  * `0x08 0x05 vv` - set hibernation start voltage to v.v V
+  * `0x08 0x06 vv` - set hibernation stop voltage to v.v V
+  * `0x08 0x07 mm` - set hibernation sleep time to mm minutes
+  * `0x08 0xff <minCycle> <maxCycle> <hibernationSleep> <minVoltage> <maxVoltage> <hibStart> <hibStop>` - set all values in one message
 * `0xff` - reboot. Reboots the node (if possible)
 
 ### Sensor commands - (Byte 0 == 0x01)
