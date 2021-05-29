@@ -176,20 +176,20 @@ void set_led(uint8_t r, uint8_t g, uint8_t b) {
 void set_hibernation(bool on) {
   if (on) {
     if (!hibernationMode) {
-    hibernationMode = true;
-    Log.notice(F("Hibernation mode now on"));
-    set_led(0,0,0);
-    vext_power(false);
-    appTxDutyCycle = hibernation_sleeptime;
-    drain_battery = false;
-    variableDutyCycle = false;
+      hibernationMode = true;
+      Log.notice(F("Hibernation mode now on"));
+      set_led(0,0,0);
+      vext_power(false);
+      appTxDutyCycle = hibernation_sleeptime;
+      drain_battery = false;
+      variableDutyCycle = false;
     } else {
       Log.verbose(F("Hibernation mode already on, doing nothing"));
     }
   } else {
     if (hibernationMode) {
       hibernationMode = false;
-      appTxDutyCycle = hibernation_sleeptime;
+      appTxDutyCycle = cycle_min;
       variableDutyCycle = true;
       vext_power(true);
       Log.notice(F("Hibernation mode now off"));
