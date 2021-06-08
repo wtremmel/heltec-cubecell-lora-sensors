@@ -29,24 +29,25 @@ CayenneLPP lpp(51);
 #define CYCLE_MAX 240000  // 4 minutes
 #define VOLTAGE_MAX 3900  // 3.9V
 #define VOLTAGE_MIN 3000  // 3.0V
+#define LOGLEVEL LOG_LEVEL_SILENT
 
 #else
 #define BATTERY_RECHARGABLE 1
 #define HAS_RGB 1
 
-#define SHUTDOWN_VOLTAGE 3000 // 2.8V
-#define RESTART_VOLTAGE 3200  // 3.0V
-#define HIBERNATION_SLEEPTIME 60*1000*20  // 20 minutes
-#define CYCLE_MIN  2*60*1000  // 2 minute
-#define CYCLE_MAX HIBERNATION_SLEEPTIME  // 1 hour
-#define VOLTAGE_MAX 3800  // 3.9V
+#define SHUTDOWN_VOLTAGE 3350 // 3.55V
+#define RESTART_VOLTAGE 3400  // 3.6V
+#define HIBERNATION_SLEEPTIME 60*1000*60  // 60 minutes
+#define CYCLE_MIN  2*60*1000  // 2 minutes
+#define CYCLE_MAX 60*1000*20  // 20 minutes
+#define VOLTAGE_MAX 3800  // 3.8V
 #define VOLTAGE_MIN RESTART_VOLTAGE  // 3.0V
+#define LOGLEVEL LOG_LEVEL_SILENT
 
 #endif
 
 
 // #define LOGLEVEL LOG_LEVEL_VERBOSE
-#define LOGLEVEL LOG_LEVEL_SILENT
 
 uint32_t cycle_min = CYCLE_MIN,
   cycle_max = CYCLE_MAX,
@@ -389,14 +390,14 @@ void setup_serial() {
 
 
 // Logging helper routines
-void printTimestamp(Print* _logOutput) {
+void printTimestamp(Print* _logOutput, int logLevel) {
   static char c[12];
   // sprintf(c, "%l ", TimerGetCurrentTime());
   sprintf(c, "%d ", millis());
   _logOutput->print(c);
 }
 
-void printNewline(Print* _logOutput) {
+void printNewline(Print* _logOutput, int logLevel) {
   _logOutput->print('\n');
 }
 
