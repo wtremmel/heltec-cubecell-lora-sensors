@@ -35,14 +35,14 @@ CayenneLPP lpp(51);
 #define BATTERY_RECHARGABLE 1
 #define HAS_RGB 1
 
-#define SHUTDOWN_VOLTAGE 3350 // 3.55V
-#define RESTART_VOLTAGE 3400  // 3.6V
-#define HIBERNATION_SLEEPTIME 60*1000*60  // 60 minutes
+#define SHUTDOWN_VOLTAGE 3500 // 3.55V
+#define RESTART_VOLTAGE 3600  // 3.6V
+#define HIBERNATION_SLEEPTIME 60*1000*120  // 120 minutes
 #define CYCLE_MIN  2*60*1000  // 2 minutes
 #define CYCLE_MAX 60*1000*20  // 20 minutes
-#define VOLTAGE_MAX 3800  // 3.8V
+#define VOLTAGE_MAX 4000  // 3.8V
 #define VOLTAGE_MIN RESTART_VOLTAGE  // 3.0V
-#define LOGLEVEL LOG_LEVEL_SILENT
+#define LOGLEVEL LOG_LEVEL_VERBOSE
 
 #endif
 
@@ -594,12 +594,12 @@ void process_system_timer_command(unsigned char len, unsigned char *buffer) {
     case 0xff:
       if (len == 7) {
         cycle_min = 60*1000*buffer[1];
-        cycle_max = 60*1000*buffer[1];
-        hibernation_sleeptime = 60*1000*buffer[1];
-        voltage_min = 100 * buffer[1];
-        voltage_max = 100 * buffer[1];
-        shutdown_voltage = 100 * buffer[1];
-        restart_voltage = 100 * buffer[1];
+        cycle_max = 60*1000*buffer[2];
+        hibernation_sleeptime = 60*1000*buffer[3];
+        voltage_min = 100 * buffer[4];
+        voltage_max = 100 * buffer[5];
+        shutdown_voltage = 100 * buffer[6];
+        restart_voltage = 100 * buffer[7];
       } else {
         Log.error(F("Only %d arguments, needed 7"),len);
       }
