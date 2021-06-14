@@ -35,12 +35,12 @@ CayenneLPP lpp(51);
 #define BATTERY_RECHARGABLE 1
 #define HAS_RGB 1
 
-#define SHUTDOWN_VOLTAGE 3500 // 3.55V
+#define SHUTDOWN_VOLTAGE 3500 // 3.5V
 #define RESTART_VOLTAGE 3600  // 3.6V
 #define HIBERNATION_SLEEPTIME 60*1000*120  // 120 minutes
 #define CYCLE_MIN  2*60*1000  // 2 minutes
 #define CYCLE_MAX 60*1000*20  // 20 minutes
-#define VOLTAGE_MAX 4000  // 3.8V
+#define VOLTAGE_MAX 4200  // 4.2V
 #define VOLTAGE_MIN RESTART_VOLTAGE  // 3.0V
 #define LOGLEVEL LOG_LEVEL_VERBOSE
 
@@ -273,8 +273,11 @@ void read_bme280() {
 }
 
 void read_gy49() {
+  float l;
   Log.verbose(F("read_gy49"));
-  lpp.addLuminosity(4,gy49.getLux());
+  l = gy49.getLux();
+  if (l < 65000)
+    lpp.addLuminosity(4,l);
 }
 
 void read_ads1115() {
