@@ -516,7 +516,7 @@ void process_system_power_command(unsigned char len, unsigned char *buffer) {
     case 0x11:
       set_hibernation(false);
       break;
-#if !BATTERY_RECHARGABLE
+#if BATTERY_RECHARGABLE
     case 0xff:
       drain_battery = true;
       Log.verbose(F("Drain battery on"));
