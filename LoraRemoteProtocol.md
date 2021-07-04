@@ -42,12 +42,12 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
 * `0x08` - set timing parameters.
   * `0x08 0x00` - set all values to default
   * `0x08 0x01 mm` - set minimum cycle time to mm minutes
-  * `0x08 0x02 mm` - set maximum cycle time to mm minutes
-  * `0x08 0x03 mm` - set hibernation sleep time to mm minutes
-  * `0x08 0x11 vv` - set min voltage to v.v V
-  * `0x08 0x12 vv` - set max voltage to v.v V
-  * `0x08 0x13 vv` - set shutdown voltage to v.v V
-  * `0x08 0x14 vv` - set restart  voltage to v.v V
+  * `0x08 0x02 mm` - set maximum cycle time to mm minutes (00 08 02 3c)
+  * `0x08 0x03 mm` - set hibernation sleep time to mm minutes (00 08 03 78)
+  * `0x08 0x11 vv` - set min voltage to v.v V (00 08 11 25) 3.7V
+  * `0x08 0x12 vv` - set max voltage to v.v V (00 08 12 2A) 4.2V
+  * `0x08 0x13 vv` - set shutdown voltage to v.v V (00 08 13 25) 3.7V
+  * `0x08 0x14 vv` - set restart  voltage to v.v V (00 08 14 25) 3.7V
   * `0x08 0xff <minCycle> <maxCycle> <hibernationSleep> <minVoltage> <maxVoltage> <shutdownV> <restartV>` - set all values in one message
 * `0xff` - reboot. Reboots the node (if possible)
 
