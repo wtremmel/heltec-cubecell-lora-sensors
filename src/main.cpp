@@ -42,7 +42,7 @@ CayenneLPP lpp(51);
 #define CYCLE_MAX 60*1000*20  // 20 minutes
 #define VOLTAGE_MAX 4200  // 4.2V
 #define VOLTAGE_MIN RESTART_VOLTAGE  // 3.0V
-#define LOGLEVEL LOG_LEVEL_VERBOSE
+#define LOGLEVEL LOG_LEVEL_SILENT
 
 #endif
 
@@ -435,6 +435,10 @@ void setup_chipid() {
 void setup() {
   // Turn on watchdog
   innerWdtEnable(true);
+
+  ledr = 0;
+  ledg = 0;
+  ledb = 0;
 
   setup_serial();
   delay(5000);
