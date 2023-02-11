@@ -92,7 +92,7 @@ uint32_t devAddr;
 LoRaMacRegion_t loraWanRegion = ACTIVE_REGION;
 
 /*LoraWan Class, Class A and Class C are supported*/
-DeviceClass_t  loraWanClass = LORAWAN_CLASS;
+DeviceClass_t  loraWanClass = LORAWAN_CLASS; 
 
 /*the application data transmission duty cycle.  value in [ms].*/
 #if BATTERY_RECHARGABLE
