@@ -8,4 +8,5 @@ pio.map
 src/cubecell.h
 *.FCStd[123]
 .DS_Store
+.vscode/*
 .vscode
