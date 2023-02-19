@@ -23,20 +23,22 @@ CayenneLPP lpp(51);
 #define HAS_RGB 0
 #define SHUTDOWN_VOLTAGE 0 // no shutdown
 
-#define RESTART_VOLTAGE 3000  // 3.0V
+#define RESTART_VOLTAGE 0  // 3.0V
 #define HIBERNATION_SLEEPTIME 60*1000*5  // 5 minutes
 #define CYCLE_MIN  60000  // 1 minute
 #define CYCLE_MAX 240000  // 4 minutes
-#define VOLTAGE_MAX 3900  // 3.9V
-#define VOLTAGE_MIN 3000  // 3.0V
+#define VOLTAGE_MAX 3330  // 3.9V
+#define VOLTAGE_MIN 3270  // 3.0V
 #define LOGLEVEL LOG_LEVEL_SILENT
 
 #else
 #define BATTERY_RECHARGABLE 1
 #define HAS_RGB 1
 
-#define SHUTDOWN_VOLTAGE 3500 // 3.5V
-#define RESTART_VOLTAGE 3600  // 3.6V
+// #define SHUTDOWN_VOLTAGE 3500 // 3.5V
+#define SHUTDOWN_VOLTAGE 2800 // 3.5V
+// #define RESTART_VOLTAGE 3600  // 3.6V
+#define RESTART_VOLTAGE 3000  // 3.6V
 #define HIBERNATION_SLEEPTIME 60*1000*120  // 120 minutes
 #define CYCLE_MIN  2*60*1000  // 2 minutes
 #define CYCLE_MAX 60*1000*20  // 20 minutes
@@ -47,7 +49,7 @@ CayenneLPP lpp(51);
 #endif
 
 
-// #define LOGLEVEL LOG_LEVEL_VERBOSE
+#define LOGLEVEL LOG_LEVEL_VERBOSE
 
 uint32_t cycle_min = CYCLE_MIN,
   cycle_max = CYCLE_MAX,
@@ -79,6 +81,8 @@ bool voltage_found = true;
 bool gy49_found = false;
 bool ads1115_found = false;
 bool ads1115_initialized = false;
+bool tsl2561_initialized = false;
+bool tsl2561_found = false;
 
 bool setup_complete = false;
 bool pixels_initalized = false;
@@ -232,6 +236,16 @@ void setup_i2c() {
       Log.verbose(F("I2C device found at address 0x%x !"),address);
       devices++;
 
+      if (address==0x39) {
+        // TSL2561
+        Log.notice(F("TSL2561 found at 0x%x"),address);
+        if (tsl2561.begin()) {
+          tsl2561.enableAutoRange(true);
+          tsl2561.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);
+        }
+        tsl2561_found = true;
+      }
+      
       if (address == 0x48) {
         // AD-converter
         Log.notice(F("ADS1115 found at 0x%x"),address);
@@ -285,6 +299,13 @@ void read_ads1115() {
     uint16_t r = ads1115.readADC_SingleEnded(i);
     lpp.addLuminosity(20+i, r);
   }
+}
+
+void read_tsl2561() {
+  sensors_event_t event;
+  Log.verbose(F("read_tsl2561"));
+  tsl2561.getEvent(&event);
+  lpp.addLuminosity(4,(float)event.light);
 }
 
 void print_timer_values() {
@@ -377,6 +398,9 @@ void read_sensors() {
     }
     if (ads1115_found) {
       read_ads1115();
+    }
+    if (tsl2561_found) {
+      read_tsl2561();
     }
     Wire.end();
   }
@@ -714,7 +738,7 @@ void loop() {
 	{
 		case DEVICE_STATE_INIT:
 		{
-			LoRaWAN.generateDeveuiByChipID();
+			// LoRaWAN.generateDeveuiByChipID();
 			printDevParam();
 			LoRaWAN.init(loraWanClass,loraWanRegion);
 			deviceState = DEVICE_STATE_JOIN;
