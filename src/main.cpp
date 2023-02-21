@@ -1,3 +1,7 @@
+// #define DEBUG
+
+
+
 #include "LoRaWan_APP.h"
 #include "Arduino.h"
 #include <Wire.h>
@@ -18,6 +22,7 @@ CayenneLPP lpp(51);
 
 #include <Max44009.h>
 
+
 #if defined(CubeCell_HalfAA)
 #define BATTERY_RECHARGABLE 0
 #define HAS_RGB 0
@@ -29,8 +34,6 @@ CayenneLPP lpp(51);
 #define CYCLE_MAX 240000  // 4 minutes
 #define VOLTAGE_MAX 3330  // 3.9V
 #define VOLTAGE_MIN 3270  // 3.0V
-#define LOGLEVEL LOG_LEVEL_SILENT
-
 #else
 #define BATTERY_RECHARGABLE 1
 #define HAS_RGB 1
@@ -44,12 +47,13 @@ CayenneLPP lpp(51);
 #define CYCLE_MAX 60*1000*20  // 20 minutes
 #define VOLTAGE_MAX 4200  // 4.2V
 #define VOLTAGE_MIN RESTART_VOLTAGE  // 3.0V
-#define LOGLEVEL LOG_LEVEL_SILENT
-
 #endif
 
-
+#if defined(DEBUG)
 #define LOGLEVEL LOG_LEVEL_VERBOSE
+#else
+#define LOGLEVEL LOG_LEVEL_SILENT
+#endif
 
 uint32_t cycle_min = CYCLE_MIN,
   cycle_max = CYCLE_MAX,
@@ -241,7 +245,7 @@ void setup_i2c() {
         Log.notice(F("TSL2561 found at 0x%x"),address);
         if (tsl2561.begin()) {
           tsl2561.enableAutoRange(true);
-          tsl2561.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);
+          tsl2561.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);
         }
         tsl2561_found = true;
       }
@@ -409,13 +413,13 @@ void read_sensors() {
 
 
 void setup_serial() {
+#if defined(DEBUG)
   Serial.begin(115200);
-#if DEBUG
-  while (!Serial);
 #endif
 }
 
 
+#if defined(DEBUG)
 // Logging helper routines
 void printTimestamp(Print* _logOutput, int logLevel) {
   static char c[12];
@@ -434,6 +438,9 @@ void setup_logging() {
   Log.setSuffix(printNewline);
   Log.verbose("Logging has started");
 }
+#else
+void setup_logging() {}
+#endif
 
 void setup_lora() {
   Log.verbose(F("setup_lora: start"));
