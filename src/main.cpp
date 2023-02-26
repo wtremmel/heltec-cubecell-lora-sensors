@@ -745,7 +745,7 @@ void loop() {
 	{
 		case DEVICE_STATE_INIT:
 		{
-			// LoRaWAN.generateDeveuiByChipID();
+			LoRaWAN.generateDeveuiByChipID();
 			printDevParam();
 			LoRaWAN.init(loraWanClass,loraWanRegion);
 			deviceState = DEVICE_STATE_JOIN;
