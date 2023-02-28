@@ -22,8 +22,21 @@ CayenneLPP lpp(51);
 
 #include <Max44009.h>
 
+#define SOLAR_ONLY 1
 
-#if defined(CubeCell_HalfAA)
+#if defined(SOLAR_ONLY)
+#define BATTERY_RECHARGABLE 1
+#define HAS_RGB 0
+#define SHUTDOWN_VOLTAGE 0 // no shutdown
+
+#define RESTART_VOLTAGE 0  // 3.0V
+#define HIBERNATION_SLEEPTIME 60*1000*2  // 2 minutes
+#define CYCLE_MIN  60000  // 1 minute
+#define CYCLE_MAX 240000  // 4 minutes
+#define VOLTAGE_MAX 4100  // 4.1V
+#define VOLTAGE_MIN 3600  // 3.6V
+
+#elif defined(CubeCell_HalfAA)
 #define BATTERY_RECHARGABLE 0
 #define HAS_RGB 0
 #define SHUTDOWN_VOLTAGE 0 // no shutdown
@@ -34,6 +47,7 @@ CayenneLPP lpp(51);
 #define CYCLE_MAX 240000  // 4 minutes
 #define VOLTAGE_MAX 3330  // 3.9V
 #define VOLTAGE_MIN 3270  // 3.0V
+
 #else
 #define BATTERY_RECHARGABLE 1
 #define HAS_RGB 1
