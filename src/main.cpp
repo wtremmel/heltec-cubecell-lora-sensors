@@ -2,14 +2,20 @@
 
 
 
-#include "LoRaWan_APP.h"
 #include "Arduino.h"
 #include <Wire.h>
 #include <ArduinoLog.h>
-#include "CubeCell_NeoPixel.h"
-#include "innerWdt.h"
 
+#if defined(ARDUINO_ARCH_ASR650X)
+#include "innerWdt.h"
+#include "LoRaWan_APP.h"
 #include "cubecell.h"
+#elif defined(ARDUINO_ARCH_ESP32)
+// #include <ESP32_LoRaWAN.h>
+// #include "esp32-hal-adc.h"
+#include "heltec.h"
+#endif
+
 
 #include <CayenneLPP.h>
 CayenneLPP lpp(51);
@@ -28,13 +34,12 @@ CayenneLPP lpp(51);
 #define BATTERY_RECHARGABLE 1
 #define HAS_RGB 0
 #define SHUTDOWN_VOLTAGE 0 // no shutdown
-
 #define RESTART_VOLTAGE 0  // 3.0V
 #define HIBERNATION_SLEEPTIME 60*1000*2  // 2 minutes
-#define CYCLE_MIN  60000  // 1 minute
-#define CYCLE_MAX 240000  // 4 minutes
+#define CYCLE_MIN  60*1000  // 1 minute
+#define CYCLE_MAX 60*1000*20  // 10 minutes
 #define VOLTAGE_MAX 4100  // 4.1V
-#define VOLTAGE_MIN 3600  // 3.6V
+#define VOLTAGE_MIN 3300  // 3.0V
 
 #elif defined(CubeCell_HalfAA)
 #define BATTERY_RECHARGABLE 0
@@ -67,6 +72,10 @@ CayenneLPP lpp(51);
 #define LOGLEVEL LOG_LEVEL_VERBOSE
 #else
 #define LOGLEVEL LOG_LEVEL_SILENT
+#endif
+
+#if HAS_RGB
+#include "CubeCell_NeoPixel.h"
 #endif
 
 uint32_t cycle_min = CYCLE_MIN,
@@ -172,6 +181,23 @@ void vext_power(bool on) {
     digitalWrite(Vext,HIGH);
   }
 }
+
+#if defined(ARDUINO_ARCH_ESP32)
+uint16_t getBatteryVoltage() {
+  analogSetCycles(8);
+  analogSetSamples(1);
+  analogSetClockDiv(1);
+  analogSetPinAttenuation(37,ADC_11db);
+  adcAttachPin(37);
+  adcStart(37);
+  // while(adcBusy(37));
+  uint16_t v = (analogRead(37)*0.0025*1000);
+  // adcEnd(37);
+
+  return v;
+}
+#endif
+
 
 void set_led(uint8_t r, uint8_t g, uint8_t b) {
   // switch on power
@@ -462,6 +488,7 @@ void setup_lora() {
 	LoRaWAN.ifskipjoin();
 }
 
+
 void setup_check_voltage() {
   // Check if voltage is above restart_voltage
   uint16_t v = getBatteryVoltage();
@@ -472,14 +499,31 @@ void setup_check_voltage() {
 }
 
 void setup_chipid() {
-  uint64_t chipID=getID();
+  uint64_t chipID = 0;
+#if defined(ARDUINO_ARCH_ASR650X)
+  chipID=getID();
   Log.notice(F("Chip ID = %X%x"),
     (uint32_t)(chipID>>32),(uint32_t)chipID);
+#elif defined(ARDUINO_ARCH_ESP32)
+  chipID=ESP.getEfuseMac();
+  Log.notice(F("ESP32 Chip model = %s Rev %d\n"), ESP.getChipModel(), ESP.getChipRevision());
+  Log.notice(F("This chip has %d cores\n"), ESP.getChipCores());
+  Log.notice(F("ESP32ChipID=%04X"),(uint16_t)(chipID>>32));//print High 2bytes
+  Log.notice(F("%08X\r\n"),(uint32_t)chipID);//print Low 4bytes.
+#endif
+}
+
+void setup_battery() {
+#if defined(ARDUINO_ARCH_ASR650X)
+#elif defined(ARDUINO_ARCH_ESP32)
+#endif
 }
 
 void setup() {
+#if defined(ARDUINO_ARCH_ASR650X)
   // Turn on watchdog
   innerWdtEnable(true);
+#endif
 
   ledr = 0;
   ledg = 0;
@@ -693,7 +737,11 @@ void process_system_command(unsigned char len, unsigned char *buffer) {
       // Reboots
       Log.notice(F("Executing reboot command"));
       delay(100);
+#if defined(ARDUINO_ARCH_ASR650X)
       HW_Reset(0);
+#elif defined(ARDUINO_ARCH_ESP32)
+      ESP.restart();
+#endif
     default:
       Log.error(F("Unknown system command %d"),buffer[0]);
       break;
