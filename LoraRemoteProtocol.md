@@ -53,6 +53,8 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
 * `0xff` - reboot. Reboots the node (if possible)
 
 ### Sensor commands - (Byte 0 == 0x01)
+* `0x00` - disable all sensor readings
+* `0x01` - enable sensor readings
 * `0x1x` - configure sensor x (see below for list)
   * `0x11` - Configure BME280
     * `0x11 0x01` - stop temperature reading

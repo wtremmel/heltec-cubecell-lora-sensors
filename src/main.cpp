@@ -1,4 +1,4 @@
-// #define DEBUG
+#define DEBUG
 
 
 
@@ -102,6 +102,12 @@ CubeCell_NeoPixel pixels(1, RGB, NEO_GRB + NEO_KHZ800);
 #endif
 Adafruit_ADS1115 ads1115;
 
+// this allows placing the sensor before enabling readings
+#ifdef DEBUG
+bool sensors_enabled = true;
+#else
+bool sensors_enabled = false;
+#endif
 
 bool bme280_found = false;
 uint8_t bme280_readings = 0x07;
@@ -114,9 +120,11 @@ bool gy49_found = false;
 
 bool ads1115_found = false;
 bool ads1115_initialized = false;
+bool adsl1115_enabled = true;
 
 bool tsl2561_initialized = false;
 bool tsl2561_found = false;
+bool tsl2561_enabled = true;
 
 bool setup_complete = false;
 bool pixels_initalized = false;
@@ -321,6 +329,7 @@ void setup_i2c() {
       if (address == 0x76) {
         // BME280
         bme280_found = bme280.begin(address);
+        bme280_found = 1;
         Log.verbose(F("BME280 found? %T"),bme280_found);
       }
     }
@@ -441,7 +450,7 @@ void read_sensors() {
 
   // initialize sensors
 
-  if (!hibernationMode) {
+  if (!hibernationMode && sensors_enabled) {
     setup_i2c();
 
     if (bme280_found) {
@@ -450,10 +459,10 @@ void read_sensors() {
     if (gy49_found) {
       read_gy49();
     }
-    if (ads1115_found) {
+    if (ads1115_found && adsl1115_enabled) {
       read_ads1115();
     }
-    if (tsl2561_found) {
+    if (tsl2561_found && tsl2561_enabled)  {
       read_tsl2561();
     }
     Wire.end();
@@ -793,11 +802,11 @@ void process_sensor_tsl2561(unsigned char len, unsigned char *buffer) {
   }
   switch (buffer[0]) {
     case 0x01:
-      tsl2561_found = 0;
+      tsl2561_enabled = 0;
       break;
     case 0x00:
     case 0xff:
-      tsl2561_found = 1;
+      tsl2561_enabled = 1;
       break;
   }
 }
@@ -808,6 +817,12 @@ void process_sensor_command(unsigned char len, unsigned char *buffer) {
     return;
   }
   switch (buffer[0]) {
+    case 0x00:
+      sensors_enabled = false;
+      break;
+    case 0x01:
+      sensors_enabled = true;
+      break;
     case 0x11:
       process_sensor_bme280(len-1,buffer+1);
       break;
