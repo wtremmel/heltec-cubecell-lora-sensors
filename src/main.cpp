@@ -38,7 +38,7 @@ CayenneLPP lpp(51);
 #define HIBERNATION_SLEEPTIME 60*1000*2  // 2 minutes
 #define CYCLE_MIN  60*1000  // 1 minute
 #define CYCLE_MAX 60*1000*20  // 10 minutes
-#define VOLTAGE_MAX 4100  // 4.1V
+#define VOLTAGE_MAX 4200  // 4.1V
 #define VOLTAGE_MIN 3300  // 3.0V
 
 #elif defined(CubeCell_HalfAA)
