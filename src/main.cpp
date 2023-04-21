@@ -23,6 +23,7 @@ CayenneLPP lpp(51);
 // Sensor Libraries
 #include "Adafruit_Si7021.h"
 #include "Adafruit_BME280.h"
+#include "Adafruit_BMP280.h"
 #include "Adafruit_TSL2561_U.h"
 #include <Adafruit_ADS1X15.h>
 
@@ -96,6 +97,7 @@ uint32_t last_cycle = HIBERNATION_SLEEPTIME;
 Adafruit_Si7021 si7021;
 Max44009 gy49(0x4a);
 Adafruit_BME280 bme280;
+Adafruit_BMP280 bmp280;
 Adafruit_TSL2561_Unified tsl2561 = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT);
 #if HAS_RGB
 CubeCell_NeoPixel pixels(1, RGB, NEO_GRB + NEO_KHZ800);
@@ -114,6 +116,8 @@ uint8_t bme280_readings = 0x07;
 #define BME280_READ_TEMPERATURE 0x01
 #define BME280_READ_HUMIDITY 0x02
 #define BME280_READ_PRESSURE 0x04
+
+bool bmp280_found = false;
 
 bool voltage_found = true;
 bool gy49_found = false;
@@ -326,11 +330,35 @@ void setup_i2c() {
         }
       }
 
-      if (address == 0x76) {
-        // BME280
-        bme280_found = bme280.begin(address);
-        bme280_found = 1;
-        Log.verbose(F("BME280 found? %T"),bme280_found);
+      if (address == 0x76 || address == 0x77) {
+        Log.verbose(F("BMP280 or BME280 or BME680 or MS5607,MS5611,MS5637"));
+        Wire.beginTransmission(address);
+        Wire.write(0xd0);
+        Wire.endTransmission();
+        Wire.requestFrom(address,1);
+        if (Wire.available() == 1) {
+          byte data1 = 0;
+          data1 = Wire.read();
+          Log.verbose(F("Device ID= 0x%x"),data1);
+          switch (data1) {
+            case 0x58:
+            Log.verbose(F("BMP280"));
+            bmp280_found = bmp280.begin(address);
+            Log.verbose(F("BMP280 found? %T"),bmp280_found);
+            break;
+            case 0x60:
+            Log.verbose(F("BME280"));
+            bme280_found = bme280.begin(address);
+            Log.verbose(F("BME280 found? %T"),bme280_found);
+            break;
+            case 0x61:
+            Log.verbose(F("BME680"));
+            break;
+            default:
+            Log.verbose(F("unknown chip"));
+            break;
+          }
+        }
       }
     }
   }
@@ -347,6 +375,15 @@ void read_bme280() {
     lpp.addRelativeHumidity(2,bme280.readHumidity());
   if (bme280_readings & BME280_READ_PRESSURE)
     lpp.addBarometricPressure(3,bme280.readPressure() / 100.0F);
+}
+
+void read_bmp280() {
+  Log.verbose(F("read_bmp280"));
+  if (bme280_readings & BME280_READ_TEMPERATURE)
+    lpp.addTemperature(1,bmp280.readTemperature());
+  if (bme280_readings & BME280_READ_PRESSURE)
+    lpp.addBarometricPressure(3,bmp280.readPressure() / 100.0F);
+
 }
 
 void read_gy49() {
@@ -455,6 +492,9 @@ void read_sensors() {
 
     if (bme280_found) {
       read_bme280();
+    }
+    if (bmp280_found) {
+      read_bmp280();
     }
     if (gy49_found) {
       read_gy49();
