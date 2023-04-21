@@ -104,10 +104,17 @@ Adafruit_ADS1115 ads1115;
 
 
 bool bme280_found = false;
+uint8_t bme280_readings = 0x07;
+#define BME280_READ_TEMPERATURE 0x01
+#define BME280_READ_HUMIDITY 0x02
+#define BME280_READ_PRESSURE 0x04
+
 bool voltage_found = true;
 bool gy49_found = false;
+
 bool ads1115_found = false;
 bool ads1115_initialized = false;
+
 bool tsl2561_initialized = false;
 bool tsl2561_found = false;
 
@@ -325,9 +332,12 @@ void setup_i2c() {
 // BME280 routines
 void read_bme280() {
   Log.verbose(F("read_bme280"));
-  lpp.addTemperature(1,bme280.readTemperature());
-  lpp.addRelativeHumidity(2,bme280.readHumidity());
-  lpp.addBarometricPressure(3,bme280.readPressure() / 100.0F);
+  if (bme280_readings & BME280_READ_TEMPERATURE)
+    lpp.addTemperature(1,bme280.readTemperature());
+  if (bme280_readings & BME280_READ_HUMIDITY)
+    lpp.addRelativeHumidity(2,bme280.readHumidity());
+  if (bme280_readings & BME280_READ_PRESSURE)
+    lpp.addBarometricPressure(3,bme280.readPressure() / 100.0F);
 }
 
 void read_gy49() {
@@ -733,6 +743,9 @@ void process_system_command(unsigned char len, unsigned char *buffer) {
     case 0x08:
       process_system_timer_command(len-1,buffer+1);
       break;
+    case 0x09:
+      setup_i2c();
+      break;
     case 0xff:
       // Reboots
       Log.notice(F("Executing reboot command"));
@@ -742,6 +755,7 @@ void process_system_command(unsigned char len, unsigned char *buffer) {
 #elif defined(ARDUINO_ARCH_ESP32)
       ESP.restart();
 #endif
+      break;
     default:
       Log.error(F("Unknown system command %d"),buffer[0]);
       break;
@@ -753,7 +767,39 @@ void process_sensor_bme280(unsigned char len, unsigned char *buffer) {
     Log.error(F("Zero length bme280 command"));
     return;
   }
+  switch (buffer[0]) {
+    case 0x00:
+    case 0xff:
+      bme280_readings = 0x07;
+      break;
+    case 0x07:
+      bme280_readings = 0;
+      break;
+    default: 
+      if (buffer[0] & BME280_READ_TEMPERATURE)
+        bme280_readings &= ~BME280_READ_TEMPERATURE;
+      if (buffer[0] & BME280_READ_HUMIDITY)
+        bme280_readings &= ~BME280_READ_HUMIDITY;
+      if (buffer[0] & BME280_READ_PRESSURE)
+        bme280_readings &= ~BME280_READ_PRESSURE;
+      break;
+  }
+}
 
+void process_sensor_tsl2561(unsigned char len, unsigned char *buffer) {
+  if (len == 0) {
+    Log.error(F("Zero length tsl2561 command"));
+    return;
+  }
+  switch (buffer[0]) {
+    case 0x01:
+      tsl2561_found = 0;
+      break;
+    case 0x00:
+    case 0xff:
+      tsl2561_found = 1;
+      break;
+  }
 }
 
 void process_sensor_command(unsigned char len, unsigned char *buffer) {
@@ -764,6 +810,9 @@ void process_sensor_command(unsigned char len, unsigned char *buffer) {
   switch (buffer[0]) {
     case 0x11:
       process_sensor_bme280(len-1,buffer+1);
+      break;
+    case 0x12:
+      process_sensor_tsl2561(len-1,buffer+1);
       break;
     default:
       Log.error(F("Unknown sensor command %d"),buffer[0]);

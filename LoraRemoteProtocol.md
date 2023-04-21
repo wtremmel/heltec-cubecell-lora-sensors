@@ -49,6 +49,7 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
   * `0x08 0x13 vv` - set shutdown voltage to v.v V (00 08 13 25) 3.7V
   * `0x08 0x14 vv` - set restart  voltage to v.v V (00 08 14 25) 3.7V
   * `0x08 0xff <minCycle> <maxCycle> <hibernationSleep> <minVoltage> <maxVoltage> <shutdownV> <restartV>` - set all values in one message
+* `0x09` - rescan i2c bus
 * `0xff` - reboot. Reboots the node (if possible)
 
 ### Sensor commands - (Byte 0 == 0x01)
