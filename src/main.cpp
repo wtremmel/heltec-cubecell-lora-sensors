@@ -1,4 +1,4 @@
-#define DEBUG
+// #define DEBUG
 
 
 
@@ -24,6 +24,7 @@ CayenneLPP lpp(51);
 #include "Adafruit_Si7021.h"
 #include "Adafruit_BME280.h"
 #include "Adafruit_BMP280.h"
+#include "Adafruit_BME680.h"
 #include "Adafruit_TSL2561_U.h"
 #include <Adafruit_ADS1X15.h>
 
@@ -98,6 +99,7 @@ Adafruit_Si7021 si7021;
 Max44009 gy49(0x4a);
 Adafruit_BME280 bme280;
 Adafruit_BMP280 bmp280;
+Adafruit_BME680 bme680;
 Adafruit_TSL2561_Unified tsl2561 = Adafruit_TSL2561_Unified(TSL2561_ADDR_FLOAT);
 #if HAS_RGB
 CubeCell_NeoPixel pixels(1, RGB, NEO_GRB + NEO_KHZ800);
@@ -105,19 +107,17 @@ CubeCell_NeoPixel pixels(1, RGB, NEO_GRB + NEO_KHZ800);
 Adafruit_ADS1115 ads1115;
 
 // this allows placing the sensor before enabling readings
-#ifdef DEBUG
-bool sensors_enabled = true;
-#else
 bool sensors_enabled = false;
-#endif
 
 bool bme280_found = false;
-uint8_t bme280_readings = 0x07;
+uint8_t bme280_readings = 0x0f;
 #define BME280_READ_TEMPERATURE 0x01
 #define BME280_READ_HUMIDITY 0x02
 #define BME280_READ_PRESSURE 0x04
+#define BME680_READ_GAS      0x08
 
 bool bmp280_found = false;
+bool bme680_found = false;
 
 bool voltage_found = true;
 bool gy49_found = false;
@@ -128,7 +128,7 @@ bool adsl1115_enabled = true;
 
 bool tsl2561_initialized = false;
 bool tsl2561_found = false;
-bool tsl2561_enabled = true;
+bool light_enabled = true;
 
 bool setup_complete = false;
 bool pixels_initalized = false;
@@ -353,6 +353,8 @@ void setup_i2c() {
             break;
             case 0x61:
             Log.verbose(F("BME680"));
+            bme680_found = bme680.begin(address);
+            Log.verbose(F("BME680 found? %T"),bme680_found);
             break;
             default:
             Log.verbose(F("unknown chip"));
@@ -369,35 +371,71 @@ void setup_i2c() {
 // BME280 routines
 void read_bme280() {
   Log.verbose(F("read_bme280"));
-  if (bme280_readings & BME280_READ_TEMPERATURE)
-    lpp.addTemperature(1,bme280.readTemperature());
-  if (bme280_readings & BME280_READ_HUMIDITY)
-    lpp.addRelativeHumidity(2,bme280.readHumidity());
-  if (bme280_readings & BME280_READ_PRESSURE)
-    lpp.addBarometricPressure(3,bme280.readPressure() / 100.0F);
+  if (sensors_enabled) {
+    if (bme280_readings & BME280_READ_TEMPERATURE)
+      lpp.addTemperature(1,bme280.readTemperature());
+    if (bme280_readings & BME280_READ_HUMIDITY)
+      lpp.addRelativeHumidity(2,bme280.readHumidity());
+    if (bme280_readings & BME280_READ_PRESSURE)
+      lpp.addBarometricPressure(3,bme280.readPressure() / 100.0F);
+  } else {
+    Log.verbose(F("Temperature: %F"),bme280.readTemperature());
+    Log.verbose(F("Humidity: %F"),bme280.readHumidity());
+    Log.verbose(F("AirPressure: %F"),bme280.readPressure());
+  }
+
 }
 
 void read_bmp280() {
   Log.verbose(F("read_bmp280"));
-  if (bme280_readings & BME280_READ_TEMPERATURE)
-    lpp.addTemperature(1,bmp280.readTemperature());
-  if (bme280_readings & BME280_READ_PRESSURE)
-    lpp.addBarometricPressure(3,bmp280.readPressure() / 100.0F);
-
+  if (sensors_enabled) {
+    if (bme280_readings & BME280_READ_TEMPERATURE)
+      lpp.addTemperature(1,bmp280.readTemperature());
+    if (bme280_readings & BME280_READ_PRESSURE)
+      lpp.addBarometricPressure(3,bmp280.readPressure() / 100.0F);
+  } else {
+    Log.verbose(F("Temperature: %F"),bmp280.readTemperature());
+    Log.verbose(F("AirPressure: %F"),bmp280.readPressure());
+  }
 }
+
+void read_bme680() {
+  Log.verbose(F("read_bme680"));
+  if (sensors_enabled) {
+    if (bme280_readings & BME280_READ_TEMPERATURE)
+      lpp.addTemperature(1,bme680.readTemperature());
+    if (bme280_readings & BME280_READ_HUMIDITY)
+      lpp.addRelativeHumidity(2,bme680.readHumidity());
+    if (bme280_readings & BME280_READ_PRESSURE)
+      lpp.addBarometricPressure(3,bme680.readPressure() / 100.0F);
+    if (bme280_readings & BME680_READ_GAS)
+      lpp.addBarometricPressure(9,bme680.readGas());
+  } else {
+    Log.verbose(F("Temperature: %F"),bme680.readTemperature());
+    Log.verbose(F("Humidity: %F"),bme680.readHumidity());
+    Log.verbose(F("AirPressure: %F"),bme680.readPressure());
+    Log.verbose(F("Gas: %u"),bme680.readGas());
+  }
+}
+
 
 void read_gy49() {
   float l;
   Log.verbose(F("read_gy49"));
   l = gy49.getLux();
-  if (l < 65000)
+  if (l < 65000.0 && sensors_enabled && light_enabled)
     lpp.addLuminosity(4,l);
+  else 
+    Log.verbose(F("light: %F"),l);
 }
 
 void read_ads1115() {
   for (int i=0;i<4;i++) {
     uint16_t r = ads1115.readADC_SingleEnded(i);
-    lpp.addLuminosity(20+i, r);
+    if (sensors_enabled)
+      lpp.addLuminosity(20+i, r);
+    else
+      Log.verbose(F("Analog %d: %u"),i,r);
   }
 }
 
@@ -405,7 +443,10 @@ void read_tsl2561() {
   sensors_event_t event;
   Log.verbose(F("read_tsl2561"));
   tsl2561.getEvent(&event);
-  lpp.addLuminosity(4,(float)event.light);
+  if (sensors_enabled && light_enabled && event.light < 65000.0)
+    lpp.addLuminosity(4,(float)event.light);
+  else
+    Log.verbose(F("light: %F"),event.light);
 }
 
 void print_timer_values() {
@@ -487,7 +528,7 @@ void read_sensors() {
 
   // initialize sensors
 
-  if (!hibernationMode && sensors_enabled) {
+  if (!hibernationMode) {
     setup_i2c();
 
     if (bme280_found) {
@@ -496,13 +537,16 @@ void read_sensors() {
     if (bmp280_found) {
       read_bmp280();
     }
+    if (bme680_found) {
+      read_bme680();
+    }
     if (gy49_found) {
       read_gy49();
     }
     if (ads1115_found && adsl1115_enabled) {
       read_ads1115();
     }
-    if (tsl2561_found && tsl2561_enabled)  {
+    if (tsl2561_found)  {
       read_tsl2561();
     }
     Wire.end();
@@ -835,18 +879,18 @@ void process_sensor_bme280(unsigned char len, unsigned char *buffer) {
   }
 }
 
-void process_sensor_tsl2561(unsigned char len, unsigned char *buffer) {
+void process_sensor_light(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
-    Log.error(F("Zero length tsl2561 command"));
+    Log.error(F("Zero length light sensor command"));
     return;
   }
   switch (buffer[0]) {
     case 0x01:
-      tsl2561_enabled = 0;
+      light_enabled = 0;
       break;
     case 0x00:
     case 0xff:
-      tsl2561_enabled = 1;
+      light_enabled = 1;
       break;
   }
 }
@@ -867,7 +911,7 @@ void process_sensor_command(unsigned char len, unsigned char *buffer) {
       process_sensor_bme280(len-1,buffer+1);
       break;
     case 0x12:
-      process_sensor_tsl2561(len-1,buffer+1);
+      process_sensor_light(len-1,buffer+1);
       break;
     default:
       Log.error(F("Unknown sensor command %d"),buffer[0]);

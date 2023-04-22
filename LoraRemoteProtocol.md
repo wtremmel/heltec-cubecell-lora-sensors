@@ -7,6 +7,7 @@
 * 06 - rain
 * 07 - memory free (debug)
 * 08 - GPS location
+* 09 - Gas resistance
 * 10-14 - rtc epoch (debug)
 * 20-23 - adc1150 values
 
@@ -56,13 +57,13 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
 * `0x00` - disable all sensor readings
 * `0x01` - enable sensor readings
 * `0x1x` - configure sensor x (see below for list)
-  * `0x11` - Configure BME280
+  * `0x11` - Configure Temperature/Pressure/Humidity
     * `0x11 0x01` - stop temperature reading
     * `0x11 0x02` - stop humidity reading
     * `0x11 0x04` - stop pressure reading
     * `0x11 0x07` - stop all readings (combined three bits together)
     * `0x11 0xff` or `0x11 0x00` - restart all readings
-  * `0x12` - Configure TSL2561
+  * `0x12` - Configure Light
     * `0x12 0x01` - stop luminosity reading
     * `0x12 0xff` or `0x12 0x00` - restart reading
 
