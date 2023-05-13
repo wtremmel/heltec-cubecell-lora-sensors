@@ -423,7 +423,7 @@ void read_gy49() {
   float l;
   Log.verbose(F("read_gy49"));
   l = gy49.getLux();
-  if (l < 65000.0 && sensors_enabled && light_enabled)
+  if (l >= 0 && l < 65000.0 && sensors_enabled && light_enabled)
     lpp.addLuminosity(4,l);
   else 
     Log.verbose(F("light: %F"),l);
@@ -443,7 +443,7 @@ void read_tsl2561() {
   sensors_event_t event;
   Log.verbose(F("read_tsl2561"));
   tsl2561.getEvent(&event);
-  if (sensors_enabled && light_enabled && event.light < 65000.0)
+  if (sensors_enabled && light_enabled && event.light >= 0 && event.light < 65000.0)
     lpp.addLuminosity(4,(float)event.light);
   else
     Log.verbose(F("light: %F"),event.light);
@@ -573,6 +573,7 @@ void printTimestamp(Print* _logOutput, int logLevel) {
 
 void printNewline(Print* _logOutput, int logLevel) {
   _logOutput->print('\n');
+  Serial.flush();
 }
 
 void setup_logging() {
@@ -662,7 +663,7 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
     Log.error(F("Zero length LED command"));
     return;
   } else {
-    Log.verbose(F("Processing LED command"));
+    Log.verbose(F("Processing LED command %d"),buffer[0]);
   }
 
   switch (buffer[0]) {
@@ -700,8 +701,9 @@ void process_system_led_command(unsigned char len, unsigned char *buffer) {
 void process_system_power_command(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
     Log.error(F("Zero length power command"));
+    return;
   } else {
-    Log.verbose(F("Processing power command"));
+    Log.verbose(F("Processing power command %d"),buffer[0]);
   }
 
   switch (buffer[0]) {
@@ -742,8 +744,9 @@ void set_default_timers() {
 void process_system_delay_command(unsigned char len, unsigned char *buffer) {
   if (len != 1) {
     Log.error(F("Len of delay command != 1"));
+    return;
   } else {
-    Log.verbose(F("Processing delay command"));
+    Log.verbose(F("Processing delay command %d"),buffer[0]);
   }
 
   if (buffer[0] == 0) {
@@ -761,8 +764,9 @@ void process_system_delay_command(unsigned char len, unsigned char *buffer) {
 void process_system_timer_command(unsigned char len, unsigned char *buffer) {
   if (len <= 1) {
     Log.error(F("Len of timer command <= 1"));
+    return;
   } else {
-    Log.verbose(F("Processing timer command"));
+    Log.verbose(F("Processing timer command %d"),buffer[0]);
   }
 
   switch(buffer[0]){
@@ -821,7 +825,7 @@ void process_system_command(unsigned char len, unsigned char *buffer) {
     Log.error(F("Zero length system command"));
     return;
   } else {
-    Log.verbose(F("Processing system command"));
+    Log.verbose(F("Processing system command %d"),buffer[0]);
   }
   switch (buffer[0]) {
     case 0x01:
@@ -859,6 +863,8 @@ void process_sensor_bme280(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
     Log.error(F("Zero length bme280 command"));
     return;
+  } else {
+    Log.verbose(F("Processing bme280 command %d"),buffer[0]);
   }
   switch (buffer[0]) {
     case 0x00:
@@ -883,6 +889,8 @@ void process_sensor_light(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
     Log.error(F("Zero length light sensor command"));
     return;
+  } else {
+    Log.verbose(F("Processing light sensor command %d"),buffer[0]);
   }
   switch (buffer[0]) {
     case 0x01:
@@ -899,6 +907,8 @@ void process_sensor_command(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
     Log.error(F("Zero length sensor command"));
     return;
+  } else {
+    Log.verbose(F("Processing sensor command %d"),buffer[0]);
   }
   switch (buffer[0]) {
     case 0x00:
@@ -914,7 +924,6 @@ void process_sensor_command(unsigned char len, unsigned char *buffer) {
       process_sensor_light(len-1,buffer+1);
       break;
     default:
-      Log.error(F("Unknown sensor command %d"),buffer[0]);
       break;
   }
 }
