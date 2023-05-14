@@ -66,6 +66,18 @@ Definition of commands to be sent to my Lora based sensor nodes. To keep message
   * `0x12` - Configure Light
     * `0x12 0x01` - stop luminosity reading
     * `0x12 0xff` or `0x12 0x00` - restart reading
+  * `0x13` - Configure AD-Chip
+    * `0x13 0x01` - stop channel 1
+    * `0x13 0x02` - stop channel 2
+    * `0x13 0x04` - stop channel 3
+    * `0x13 0x08` - stop channel 4
+    * `0x13 0x0f` - stop all channels (combine bits)
+    * `0x13 0x10` - start channel 1
+    * `0x13 0x20` - start channel 2
+    * `0x13 0x40` - start channel 3
+    * `0x13 0x80` - start channel 4
+    * `0x13 0xf0` - start all channels (combine bits)
+    * `0x13 0x00` `0x13 0xff`  - also start all channels
 
 ### Sending commands - (Byte 0 == 0x02)
 * `0x01` - switch sending type
