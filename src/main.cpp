@@ -1,5 +1,5 @@
 // #define DEBUG
-
+// #define ONEWIRE
 
 
 #include "Arduino.h"
@@ -16,6 +16,7 @@
 #include "heltec.h"
 #endif
 
+#include <EEPROM.h>
 
 #include <CayenneLPP.h>
 CayenneLPP lpp(51);
@@ -38,10 +39,10 @@ CayenneLPP lpp(51);
 #define SHUTDOWN_VOLTAGE 0 // no shutdown
 #define RESTART_VOLTAGE 0  // 3.0V
 #define HIBERNATION_SLEEPTIME 60*1000*2  // 2 minutes
-#define CYCLE_MIN  60*1000  // 1 minute
-#define CYCLE_MAX 60*1000*20  // 10 minutes
-#define VOLTAGE_MAX 4200  // 4.1V
-#define VOLTAGE_MIN 3300  // 3.0V
+#define CYCLE_MIN  60*1000*2  // 2 minute
+#define CYCLE_MAX 60*1000*20  // 20 minutes
+#define VOLTAGE_MAX 4100  // 4.1V
+#define VOLTAGE_MIN 3000  // 3.0V
 
 #elif defined(CubeCell_HalfAA)
 #define BATTERY_RECHARGABLE 0
@@ -93,6 +94,10 @@ uint16_t lastV = 0;
 bool hibernationMode = false;
 uint32_t last_cycle = HIBERNATION_SLEEPTIME;
 
+#if defined(ONEWIRE)
+#include <OneWire.h>
+OneWire ds(1);
+#endif
 
 // Global Objects
 Adafruit_Si7021 si7021;
@@ -108,6 +113,7 @@ Adafruit_ADS1115 ads1115;
 
 // this allows placing the sensor before enabling readings
 bool sensors_enabled = false;
+#define EE_SENSORS_ENABLED 0
 
 bool bme280_found = false;
 uint8_t bme280_readings = 0x0f;
@@ -115,6 +121,7 @@ uint8_t bme280_readings = 0x0f;
 #define BME280_READ_HUMIDITY 0x02
 #define BME280_READ_PRESSURE 0x04
 #define BME680_READ_GAS      0x08
+#define EE_BME280_READINGS 4
 
 bool bmp280_found = false;
 bool bme680_found = false;
@@ -124,11 +131,15 @@ bool gy49_found = false;
 
 bool ads1115_found = false;
 bool ads1115_initialized = false;
-bool adsl1115_enabled = true;
+bool ads1115_enabled = true;
+#define EE_ADS1115_ENABLED 1
+uint8_t ads1115_mask = 0x0f; // enabled channels
+#define EE_ADS1115_MASK 2
 
 bool tsl2561_initialized = false;
 bool tsl2561_found = false;
 bool light_enabled = true;
+#define EE_LIGHT_ENABLED 3
 
 bool setup_complete = false;
 bool pixels_initalized = false;
@@ -409,7 +420,7 @@ void read_bme680() {
     if (bme280_readings & BME280_READ_PRESSURE)
       lpp.addBarometricPressure(3,bme680.readPressure() / 100.0F);
     if (bme280_readings & BME680_READ_GAS)
-      lpp.addBarometricPressure(9,bme680.readGas());
+      lpp.addBarometricPressure(9,bme680.readGas()/1000.0);
   } else {
     Log.verbose(F("Temperature: %F"),bme680.readTemperature());
     Log.verbose(F("Humidity: %F"),bme680.readHumidity());
@@ -448,6 +459,43 @@ void read_tsl2561() {
   else
     Log.verbose(F("light: %F"),event.light);
 }
+
+#if defined(ONEWIRE)
+void read_ds1820() {
+  uint8_t data[12],addr[8],present=0;
+  ds.reset_search();
+  if (!ds.search(addr)) {
+    Log.verbose(F("ds1820: no more addresses"));
+    ds.reset_search();
+    return;
+  }
+  if (OneWire::crc8(addr,7) != addr[7]) {
+    Log.error(F("ds1820: crc not valid"));
+    return;
+  }
+  if (addr[0] == 0x10) {
+    Log.verbose(F("ds1820: ds18s20 found"));
+  } else if (addr[0] == 0x28) {
+    Log.verbose(F("ds1820: ds18b20 found"));
+  } else {
+    Log.error(F("ds1820 family not recoginzed: %d"),addr[0]);
+    return;
+  }
+  ds.reset();
+  ds.select(addr);
+  ds.write(0x44,1);
+  delay(1000);
+  present = ds.reset();
+  ds.select(addr);
+  ds.write (0xbe);
+  Log.verbose(F("ds1820 present: %d"),present);
+  for (int i=0;i<9;i++){
+    data[i] = ds.read();
+    Log.verbose(F("ds1820 data: %d"),data[i]);
+  }
+  
+}
+#endif
 
 void print_timer_values() {
   Log.verbose(F("cycle_min = %d"),cycle_min);
@@ -543,13 +591,16 @@ void read_sensors() {
     if (gy49_found) {
       read_gy49();
     }
-    if (ads1115_found && adsl1115_enabled) {
+    if (ads1115_found && ads1115_enabled) {
       read_ads1115();
     }
     if (tsl2561_found)  {
       read_tsl2561();
     }
     Wire.end();
+#if defined(ONEWIRE)
+    read_ds1820();
+#endif
   }
 }
 
@@ -573,6 +624,7 @@ void printTimestamp(Print* _logOutput, int logLevel) {
 
 void printNewline(Print* _logOutput, int logLevel) {
   _logOutput->print('\n');
+  delay(1);
   Serial.flush();
 }
 
@@ -617,6 +669,24 @@ void setup_chipid() {
 #endif
 }
 
+void setup_eeprom() {
+  EEPROM.begin(128);
+  sensors_enabled = EEPROM.read(EE_SENSORS_ENABLED);
+  Log.verbose(F("EEPROM sensors_enabled: %d"),sensors_enabled);
+
+  light_enabled = EEPROM.read(EE_LIGHT_ENABLED);
+  Log.verbose(F("EEPROM light_enabled: %d"),light_enabled);
+
+  ads1115_enabled = EEPROM.read(EE_ADS1115_ENABLED);
+  Log.verbose(F("EEPROM ads1115_enabled: %d"),ads1115_enabled);
+
+  ads1115_mask = EEPROM.read(EE_ADS1115_MASK);
+  Log.verbose(F("EEPROM ads1115_mask: %d"),ads1115_mask);
+
+  bme280_readings = EEPROM.read(EE_BME280_READINGS);
+  Log.verbose(F("EEPROM bme280_readings: %d"),bme280_readings);
+}
+
 void setup_battery() {
 #if defined(ARDUINO_ARCH_ASR650X)
 #elif defined(ARDUINO_ARCH_ESP32)
@@ -637,6 +707,8 @@ void setup() {
   delay(5000);
   setup_logging();
   Log.verbose(F("setup(): Logging started"));
+
+  setup_eeprom();
   setup_chipid();
   setup_check_voltage();
 
@@ -903,6 +975,31 @@ void process_sensor_light(unsigned char len, unsigned char *buffer) {
   }
 }
 
+void process_sensor_ads1115(unsigned char len, unsigned char *buffer) {
+  if (len != 1) {
+    Log.error(F("Zero length ADS1115 command"));
+    return;
+  } else {
+    Log.verbose(F("Processing ADS1115 command %d"),buffer[0]);
+  }
+  if (buffer[0] == 0 || buffer[0] == 0xff) {
+    ads1115_mask = 0x0f;
+  } else {
+    uint8_t counter1 = 0x01, counter2 = 0x10;
+    int i;
+    Log.verbose(F("Mask: %d"),ads1115_mask);
+    for (i=0; i < 4; i++) {
+      if (buffer[0] & counter1)
+        ads1115_mask &= ~counter1;
+      if (buffer[0] & counter2)
+        ads1115_mask |= counter1;
+      counter1 <<= 1;
+      counter2 <<= 1;
+    }
+    Log.verbose(F("Mask: %d"),ads1115_mask);
+  }
+}
+
 void process_sensor_command(unsigned char len, unsigned char *buffer) {
   if (len == 0) {
     Log.error(F("Zero length sensor command"));
@@ -916,6 +1013,9 @@ void process_sensor_command(unsigned char len, unsigned char *buffer) {
       break;
     case 0x01:
       sensors_enabled = true;
+      light_enabled = 1;
+      bme280_readings = 0x07;
+      ads1115_mask = 0x0f;
       break;
     case 0x11:
       process_sensor_bme280(len-1,buffer+1);
@@ -923,9 +1023,23 @@ void process_sensor_command(unsigned char len, unsigned char *buffer) {
     case 0x12:
       process_sensor_light(len-1,buffer+1);
       break;
+    case 0x13:
+      process_sensor_ads1115(len-1,buffer+1);
+      break;
     default:
       break;
   }
+  EEPROM.write(EE_SENSORS_ENABLED,sensors_enabled);
+  EEPROM.write(EE_BME280_READINGS,bme280_readings);
+  EEPROM.write(EE_ADS1115_MASK,ads1115_mask);
+  EEPROM.write(EE_LIGHT_ENABLED,light_enabled);
+  
+  if (EEPROM.commit()) {
+    Log.verbose(F("EEPROM commit ok"));
+  } else {
+    Log.error(F("EEPROM commit failed"));
+  }
+
 }
 
 void process_received_lora(unsigned char len, unsigned char *buffer) {
