@@ -130,6 +130,7 @@ bool gy49_found = false;
 
 bool ads1115_found = false;
 bool ads1115_initialized = false;
+#define ADS1115_CUTOFF_VOLTAGE 3500
 #define EE_ADS1115_ENABLED 1
 #define EE_ADS1115_MASK 2
 
@@ -441,9 +442,13 @@ void read_gy49() {
 
 void read_ads1115() {
   uint8_t masked = 1;
+  bool v_ok = (getBatteryVoltage() >= ADS1115_CUTOFF_VOLTAGE);
   for (int i=0;i<4;i++) {
     uint16_t r = ads1115.readADC_SingleEnded(i);
-    if (EEPROM.read(EE_SENSORS_ENABLED) && EEPROM.read(EE_ADS1115_ENABLED) && (masked & EEPROM.read(EE_ADS1115_MASK)))
+    if (EEPROM.read(EE_SENSORS_ENABLED) && 
+	    EEPROM.read(EE_ADS1115_ENABLED) && 
+	    (masked & EEPROM.read(EE_ADS1115_MASK)) &&
+	    v_ok)
       lpp.addLuminosity(20+i, r);
     else
       Log.verbose(F("Not writtten: Analog %d: %u"),i,r);
