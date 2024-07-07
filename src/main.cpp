@@ -39,8 +39,8 @@ CayenneLPP lpp(51);
 #define SHUTDOWN_VOLTAGE 0 // no shutdown
 #define RESTART_VOLTAGE 0  // 3.0V
 #define HIBERNATION_SLEEPTIME 60*1000*2  // 2 minutes
-#define CYCLE_MIN  60*1000*2  // 2 minute
-#define CYCLE_MAX 60*1000*20  // 20 minutes
+#define CYCLE_MIN  60*1000*3  // 2 minute
+#define CYCLE_MAX 60*1000*30  // 20 minutes
 #define VOLTAGE_MAX 4100  // 4.1V
 #define VOLTAGE_MIN 3000  // 3.0V
 
